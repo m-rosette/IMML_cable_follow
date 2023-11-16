@@ -363,9 +363,9 @@ class ControlNode(object):
         # while self.imu_acc_x is None:
         #     rospy.loginfo("Waiting for: imu_node")
         while self.gripper_pos is None:
-            rospy.loginfo("Waiting for: gripper_node")
+            rospy.sleep(.25)
         while self.tact_sensor0 is None:
-            rospy.loginfo("Waiting for: papillarray node")
+            rospy.sleep(.25)
 
     def shutdown_function(self):
         self.record_data(record=False)
