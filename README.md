@@ -9,3 +9,8 @@ Launch the gripper bringup with:
 roslaunch contactille_gripper gripper_bringup.launch
 ```
 This will identify ports for the Contactille sensors and Dynamixel controlller, and start feedback and control nodes.
+
+
+
+
+Credit to Kyle Mathenia for the gripper ROS code. Check out his original code [here](https://github.com/kylemathenia/IMML_Contactile_Gripper).
