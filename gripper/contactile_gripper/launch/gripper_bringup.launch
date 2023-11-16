@@ -41,8 +41,8 @@
 <!-- The pose node below predicts cable pose based on tactile data -->
 <!-- <node pkg="contactile_gripper" name="pose" type="pose_node.py"/> -->
 
-<node pkg="contactile_gripper" name="control" type="control_node.py" launch-prefix="gnome-terminal --" output="screen"/>
+<node pkg="contactile_gripper" name="control" type="control_node.py" output="screen"/>
 
-<node pkg="contactile_gripper" name="UI" type="ui_node.py" launch-prefix="gnome-terminal --" output="screen"/>
+<node pkg="contactile_gripper" name="UI" type="ui_node.py" launch-prefix="xterm -e" output="screen"/>
 
 </launch>

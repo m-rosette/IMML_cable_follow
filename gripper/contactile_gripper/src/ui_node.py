@@ -117,9 +117,7 @@ class UiNode(object):
         """.format(key_map['grip_open'], key_map['grip_close'],key_map['grip_increment_inc'],
                    key_map['grip_increment_dec'],key_map['prompt'],key_map['EMO'])
 
-    def menu_routines(self,key)de pkg="contactile_gripper" name="control" type="control_node.py" launch-prefix="gnome-terminal --" output="screen"/>
-
-# <node pkg="contactile_gripper" name="UI" type="ui_node.py" launch-prefix="gnome-terminal --" output="screen"/>:
+    def menu_routines(self,key):
         rospy.logdebug('[menu_routines] key: {}'.format(key))
         if key == '1':
             self.new_menu_update(self.menu_routines_grasp_and_release)
