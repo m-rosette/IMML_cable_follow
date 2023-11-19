@@ -3,6 +3,13 @@
 import rospy
 from std_msgs.msg import String
 
+# General idea - this is high level trial control
+
+# Gripper_Cmp - publish gripper position/current values here
+# UR_something - publish cartesian movement changes here
+# __action_server - use this to start data collection
+# camera_service - takes photo, saves it, and returns cable pose
+
 class CableFollow:
     def __init__(self):
 
@@ -15,8 +22,9 @@ class CableFollow:
     def main(self):
         for i in range(10):
             
-            cmd_msg = "position_101027"
-            self.gripper_pos_pub.publish(cmd_msg)
+            # Sample publish gripper position
+            # cmd_msg = "position_101027"
+            # self.gripper_pos_pub.publish(cmd_msg)
 
             rospy.sleep(1)
 
