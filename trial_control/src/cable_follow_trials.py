@@ -37,6 +37,9 @@ class CableFollow:
             rospy.sleep(2)
             self.record_ac.cancel_all_goals()
 
+            if rospy.is_shutdown()
+                break
+
 
             
             # Sample publish gripper position
