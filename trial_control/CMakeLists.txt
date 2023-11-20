@@ -10,12 +10,8 @@ project(trial_control)
 find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
-<<<<<<< HEAD
-  actionlib_msgs
-=======
   actionlib
   sensor_msgs
->>>>>>> picture_node
   message_generation
 )
 
