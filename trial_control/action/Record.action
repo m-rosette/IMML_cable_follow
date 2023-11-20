@@ -1,5 +1,5 @@
 #goal
-bool start
+string file_name
 ---
 #result
 bool result

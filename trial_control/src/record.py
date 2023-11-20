@@ -20,9 +20,10 @@ class Record:
     def __init__(self):
         self.storage_directory = '/root/data'
         # The file number we are saving 
-        self.file_num = self.get_start_file_index()
+        # self.file_num = self.get_start_file_index()
 
         self.mutex = threading.Lock()
+        self.r = rospy.Rate(20)
 
         # Initialize dictionaries to store data from subscribers
         self.initialize_tactile_dict()
@@ -45,8 +46,8 @@ class Record:
         
    
     def action_callback(self, goal):
-        self.file_num += 1
-        rospy.loginfo("Recording starting. Saving to %d.csv", self.file_num)
+        self.file_name = goal.file_name
+        rospy.loginfo("Recording starting. Saving to %s.csv", self.file_name)
 
         # Combine all of the data into one dictionary
         self.mutex.acquire()
@@ -54,7 +55,7 @@ class Record:
         self.mutex.release()
 
         # print("tactile: ", self.tactile_0)
-        with open('/root/data/' + str(self.file_num) + '.csv', 'w') as csvfile:
+        with open('/root/data/' + str(self.file_name) + '.csv', 'w') as csvfile:
             # Write the header
             w = csv.DictWriter(csvfile, combined_dict)
             w.writeheader()
@@ -65,7 +66,7 @@ class Record:
                 combined_dict = OrderedDict(copy(self.position).items() + copy(self.tactile_0).items() + copy(self.tactile_1).items())
                 self.mutex.release()
                 w.writerow(combined_dict)
-                rospy.sleep(.1)
+                self.r.sleep()
 
             self.record_server.set_preempted()
             rospy.loginfo("Recording stopped.")
