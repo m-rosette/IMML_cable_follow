@@ -14,3 +14,6 @@ This will identify ports for the Contactille sensors and Dynamixel controlller, 
 
 
 Credit to Kyle Mathenia for the gripper ROS code. Check out his original code [here](https://github.com/kylemathenia/IMML_Contactile_Gripper).
+
+
+Need to add pip install ordereddict
