@@ -11,15 +11,18 @@ from collections import OrderedDict
 from trial_control.msg import RecordAction, RecordGoal, RecordFeedback, RecordResult
 from actionlib import SimpleActionServer
 from copy import deepcopy as copy
+import threading
+
 
 # Serves as an action client that starts data recording (saves data just to csv)
 
 class Record:
     def __init__(self):
-        self.actively_reading = False
         self.storage_directory = '/root/data'
         # The file number we are saving 
         self.file_num = self.get_start_file_index()
+
+        self.mutex = threading.Lock()
 
         # Initialize dictionaries to store data from subscribers
         self.initialize_tactile_dict()
@@ -46,10 +49,9 @@ class Record:
         rospy.loginfo("Recording starting. Saving to %d.csv", self.file_num)
 
         # Combine all of the data into one dictionary
-        self.actively_reading = True
-        rospy.sleep(.015)
+        self.mutex.acquire()
         combined_dict = OrderedDict(copy(self.position).items() + copy(self.tactile_0).items() + copy(self.tactile_1).items())
-        self.actively_reading = False
+        self.mutex.release()
 
         # print("tactile: ", self.tactile_0)
         with open('/root/data/' + str(self.file_num) + '.csv', 'w') as csvfile:
@@ -59,12 +61,12 @@ class Record:
 
             while not self.record_server.is_preempt_requested() and not rospy.is_shutdown():
                 # Combine all of the data into one dictionary
-                self.actively_reading = True
-                rospy.sleep(.015)
+                self.mutex.acquire()
                 combined_dict = OrderedDict(copy(self.position).items() + copy(self.tactile_0).items() + copy(self.tactile_1).items())
-                self.actively_reading = False
+                self.mutex.release()
                 w.writerow(combined_dict)
                 rospy.sleep(.1)
+
             self.record_server.set_preempted()
             rospy.loginfo("Recording stopped.")
 
@@ -75,8 +77,7 @@ class Record:
     def tactile_0_callback(self, tac_in):
         # Saves the subscribed tactile 0 data to variable
         #self.tactile_0 = tac_in
-        while self.actively_reading:
-            rospy.sleep(.01)
+        self.mutex.acquire()
         self.tactile_0 = OrderedDict() 
         for i in range(8):
             
@@ -93,12 +94,12 @@ class Record:
         self.tactile_0['0_target_grip_force'] = tac_in.target_grip_force
         self.tactile_0['0_is_sd_active'] = tac_in.is_sd_active
         self.tactile_0['0_is_ref_loaded'] = tac_in.is_ref_loaded
-        self.tactile_0['0_is_contact'] = tac_in.is_contact            
+        self.tactile_0['0_is_contact'] = tac_in.is_contact  
+        self.mutex.release()          
             
     def tactile_1_callback(self, tac_in):
         # Saves the subscribed tactile 1 data to variable
-        while self.actively_reading:
-            rospy.sleep(.01)
+        self.mutex.acquire()
         self.tactile_1 = OrderedDict() 
         for i in range(8):
             
@@ -115,7 +116,8 @@ class Record:
         self.tactile_1['1_target_grip_force'] = tac_in.target_grip_force
         self.tactile_1['1_is_sd_active'] = tac_in.is_sd_active
         self.tactile_1['1_is_ref_loaded'] = tac_in.is_ref_loaded
-        self.tactile_1['1_is_contact'] = tac_in.is_contact      
+        self.tactile_1['1_is_contact'] = tac_in.is_contact   
+        self.mutex.release()   
 
     def initialize_tactile_dict(self):
         """

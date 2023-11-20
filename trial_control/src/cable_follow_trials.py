@@ -7,7 +7,7 @@ from trial_control.msg import RecordAction, RecordGoal
 
 # General idea - this is high level trial control
 
-# Gripper_Cmp - publish gripper position/current values here
+# Gripper_Cmd - publish gripper position/current values here
 # UR_something - publish cartesian movement changes here
 # __action_server - use this to start data collection
 # camera_service - takes photo, saves it, and returns cable pose
