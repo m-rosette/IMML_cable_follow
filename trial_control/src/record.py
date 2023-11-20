@@ -47,7 +47,7 @@ class Record:
 
         # Combine all of the data into one dictionary
         self.actively_reading = True
-        rospy.sleep(.01)
+        rospy.sleep(.015)
         combined_dict = OrderedDict(copy(self.position).items() + copy(self.tactile_0).items() + copy(self.tactile_1).items())
         self.actively_reading = False
 
@@ -60,12 +60,12 @@ class Record:
             while not self.record_server.is_preempt_requested() and not rospy.is_shutdown():
                 # Combine all of the data into one dictionary
                 self.actively_reading = True
-                rospy.sleep(.01)
+                rospy.sleep(.015)
                 combined_dict = OrderedDict(copy(self.position).items() + copy(self.tactile_0).items() + copy(self.tactile_1).items())
                 self.actively_reading = False
                 w.writerow(combined_dict)
                 rospy.sleep(.1)
-
+            self.record_server.set_preempted()
             rospy.loginfo("Recording stopped.")
 
     def pos_callback(self, pos_in):
