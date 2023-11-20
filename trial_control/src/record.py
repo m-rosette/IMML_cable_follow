@@ -10,11 +10,13 @@ import csv
 from collections import OrderedDict
 from trial_control.msg import RecordAction, RecordGoal, RecordFeedback, RecordResult
 from actionlib import SimpleActionServer
+from copy import deepcopy as copy
 
 # Serves as an action client that starts data recording (saves data just to csv)
 
 class Record:
     def __init__(self):
+        self.actively_reading = False
         self.storage_directory = '/root/data'
         # The file number we are saving 
         self.file_num = self.get_start_file_index()
@@ -31,16 +33,23 @@ class Record:
 
         # Create action server
         self.record_server = SimpleActionServer("record_server", RecordAction, execute_cb=self.action_callback, auto_start=False)
-
+        self.record_server.start()
+        rospy.loginfo("Everything up!")
 
         self.storage_directory = '/root/data'
-        pass
+
+
+        
    
     def action_callback(self, goal):
         self.file_num += 1
+        rospy.loginfo("Recording starting. Saving to %d.csv", self.file_num)
 
         # Combine all of the data into one dictionary
-        combined_dict = OrderedDict(self.position.items() + self.tactile_0.items() + self.tactile_1.items())
+        self.actively_reading = True
+        rospy.sleep(.01)
+        combined_dict = OrderedDict(copy(self.position).items() + copy(self.tactile_0).items() + copy(self.tactile_1).items())
+        self.actively_reading = False
 
         # print("tactile: ", self.tactile_0)
         with open('/root/data/' + str(self.file_num) + '.csv', 'w') as csvfile:
@@ -50,9 +59,14 @@ class Record:
 
             while not self.record_server.is_preempt_requested() and not rospy.is_shutdown():
                 # Combine all of the data into one dictionary
-                combined_dict = OrderedDict(self.position.items() + self.tactile_0.items() + self.tactile_1.items())
+                self.actively_reading = True
+                rospy.sleep(.01)
+                combined_dict = OrderedDict(copy(self.position).items() + copy(self.tactile_0).items() + copy(self.tactile_1).items())
+                self.actively_reading = False
                 w.writerow(combined_dict)
                 rospy.sleep(.1)
+
+            rospy.loginfo("Recording stopped.")
 
     def pos_callback(self, pos_in):
         # Saves the subscribed gripper position data to variable
@@ -61,6 +75,8 @@ class Record:
     def tactile_0_callback(self, tac_in):
         # Saves the subscribed tactile 0 data to variable
         #self.tactile_0 = tac_in
+        while self.actively_reading:
+            rospy.sleep(.01)
         self.tactile_0 = OrderedDict() 
         for i in range(8):
             
@@ -81,6 +97,8 @@ class Record:
             
     def tactile_1_callback(self, tac_in):
         # Saves the subscribed tactile 1 data to variable
+        while self.actively_reading:
+            rospy.sleep(.01)
         self.tactile_1 = OrderedDict() 
         for i in range(8):
             
@@ -144,8 +162,11 @@ class Record:
     def get_start_file_index(self):
         # Returns the starting file number (old number)
         current_files = os.listdir(self.storage_directory)
-        numbers = np.array([i.split('.csv', 1)[0] for i in current_files], dtype=int)
-        return np.max(numbers) 
+        try:
+            numbers = np.array([i.split('.csv', 1)[0] for i in current_files], dtype=int)
+            return np.max(numbers) 
+        except:
+            return 0
 
     def main(self):
         # for i in range(30):
@@ -155,6 +176,6 @@ class Record:
         rospy.spin()
 
 if __name__ == '__main__':
-    record = Record()
     rospy.init_node('record', anonymous=True)
+    record = Record()
     record.main()
