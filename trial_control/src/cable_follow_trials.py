@@ -32,9 +32,12 @@ class CableFollow:
         self.record_ac = SimpleActionClient("record_server", RecordAction)
         rospy.logwarn("Waiting for recording server to come up.")
         self.record_ac.wait_for_server()
+        rospy.loginfo("Recording server up!")
+        ospy.logwarn("Waiting for picture service to come up.")
         rospy.wait_for_service('picture_trigger')
+        rospy.loginfo("Picture service up, ready!")
         self.pic = rospy.ServiceProxy('picture_trigger', PictureTrigger)
-        rospy.loginfo("Recording server up, ready!")
+        
 
         
 
