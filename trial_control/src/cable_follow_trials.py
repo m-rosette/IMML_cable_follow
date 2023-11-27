@@ -67,7 +67,8 @@ class CableFollow:
             # Sleep a tiny bit then stop recording
             rospy.sleep(2.5)
             self.record_ac.cancel_all_goals()
-            picture_return = self.pic(trial_num = (str(self.file_num)+"_"+str(counter)))
+            pic_name = str(self.file_num)+"_"+str(counter)
+            picture_return = self.pic(trial_num = pic_name)
 
             # Open the gripper
             self.gripper_pos_pub.publish("position_10000")

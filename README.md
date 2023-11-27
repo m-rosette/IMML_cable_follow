@@ -24,3 +24,11 @@ roslaunch ur_calibration calibration_correction.launch robot_ip:=169.254.174.50 
 
 
 pip install scikit-image
+
+
+
+Launch these:
+roslaunch contactile_gripper gripper_bringup.launch 
+rsrun trial_control get_picture.py
+rosrun trial_control record.py
+rosrun trial_control cable_follow_trials.py
