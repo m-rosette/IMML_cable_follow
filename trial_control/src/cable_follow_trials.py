@@ -43,18 +43,18 @@ class CableFollow:
         self.gripper_pos_pub.publish("position_10000")
 
         # Hit enter to continue
-        user_con = raw_input("Enter to take picture.")
+        user_con = raw_input("Enter to take initial picture.")
         print(self.file_num)
-        picture_return = self.pic(trial_num = self.file_num)
+        picture_return = self.pic(trial_num = str(self.file_num))
 
         user_con = raw_input("Enter to start.")
         counter = 0
         while not rospy.is_shutdown():
-            if counter > 4: 
+            if counter > 9: 
                 break
         # Take picture
             
-            rospy.sleep(1.75)
+            
             # if rospy.is_shutdown():
             #     break
             name = str(self.file_num)+"_"+str(counter)
@@ -67,10 +67,12 @@ class CableFollow:
             # Sleep a tiny bit then stop recording
             rospy.sleep(2.5)
             self.record_ac.cancel_all_goals()
+            picture_return = self.pic(trial_num = (str(self.file_num)+"_"+str(counter)))
 
             # Open the gripper
             self.gripper_pos_pub.publish("position_10000")
             counter += 1
+            rospy.sleep(1.75)
 
 
 
