@@ -18,10 +18,11 @@ Credit to Kyle Mathenia for the gripper ROS code. Check out his original code [h
 
 Need to add pip install ordereddict
 
-roslaunch ur_robot_driver ur5e_bringup.launch robot_ip:=169.254.177.232
+roslaunch ur_robot_driver ur5e_bringup.launch robot_ip:=169.254.177.232 kinematics_config:="/root/cindys_ur5e_calibration.yaml"
+roslaunch ur5e_moveit_config moveit_planning_execution.launch
 roslaunch ur5e_moveit_config moveit_rviz.launch
 
-roslaunch ur_calibration calibration_correction.launch robot_ip:=169.254.174.50 target_filename:="${HOME}/my_robot_calibration.yaml"
+roslaunch ur_calibration calibration_correction.launch 
 
 
 pip install scikit-image
