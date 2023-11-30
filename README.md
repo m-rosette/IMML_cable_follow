@@ -34,3 +34,9 @@ roslaunch contactile_gripper gripper_bringup.launch
 rsrun trial_control get_picture.py
 rosrun trial_control record.py
 rosrun trial_control cable_follow_trials.py
+
+
+
+pip install setuptools -U
+python2 -m pip install install protobuf==3.17.3
+python2 -m pip install install tensorflow-gpu==1.12.0
