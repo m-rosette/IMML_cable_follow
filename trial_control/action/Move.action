@@ -1,0 +1,8 @@
+#goal
+trial_control/Movement delta_move
+---
+#result
+bool result
+---
+#feedback
+bool status

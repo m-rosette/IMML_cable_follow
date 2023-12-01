@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 import rospy
 from std_msgs.msg import String, Int16
@@ -33,7 +33,7 @@ class CableFollow:
         rospy.logwarn("Waiting for recording server to come up.")
         self.record_ac.wait_for_server()
         rospy.loginfo("Recording server up!")
-        ospy.logwarn("Waiting for picture service to come up.")
+        rospy.logwarn("Waiting for picture service to come up.")
         rospy.wait_for_service('picture_trigger')
         rospy.loginfo("Picture service up, ready!")
         self.pic = rospy.ServiceProxy('picture_trigger', PictureTrigger)
@@ -46,7 +46,7 @@ class CableFollow:
         self.gripper_pos_pub.publish("position_10000")
 
         # Hit enter to continue
-        user_con = raw_input("Enter to take initial picture.")
+        user_con = input("Enter to take initial picture.")
         print(self.file_num)
         picture_return = self.pic(trial_num = str(self.file_num))
 

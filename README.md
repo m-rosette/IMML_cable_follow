@@ -31,7 +31,7 @@ pip install scikit-image
 
 Launch these:
 roslaunch contactile_gripper gripper_bringup.launch 
-rsrun trial_control get_picture.py
+rosrun trial_control get_picture.py
 rosrun trial_control record.py
 rosrun trial_control cable_follow_trials.py
 

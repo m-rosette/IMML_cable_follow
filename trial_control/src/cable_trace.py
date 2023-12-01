@@ -4,6 +4,20 @@ import rospy
 
 
 # General idea - this is high level trial control
+"""
+1) Freedrive the robot to the the starting location on the cable
+
+Repeat:
+A) Close the gripper, recording data
+B) Open the gripper
+C) Pass the data to the LSTM service
+D) Get back the delta x, y, theta 
+E) Call the move_arm action server
+
+"""
+
+
+
 
 # Gripper_Cmd - publish gripper position/current values here
 # UR_something - publish cartesian movement changes here
