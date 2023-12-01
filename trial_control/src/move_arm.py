@@ -13,7 +13,7 @@ import tf2_ros
 import tf2_geometry_msgs  # **Do not use geometry_msgs. Use this instead for PoseStamped
 from tf.transformations import *
 from copy import deepcopy
-
+from actionlib import SimpleActionServer
 
 # General idea - this is high level trial control
 
@@ -49,39 +49,45 @@ class CableTrace:
 
       Returns true when complete, false if failed
 
+
+      y/z is in plane 
+      rotation around x
       z+ is straight out from end effector
       y- is directly out from plug
       """
 
-      x = goal.x
+      print(goal.delta_move)
 
       self.arm_group.set_pose_reference_frame("tool0")
       final_pose = PoseStamped()
+      final_pose.pose.position.y = goal.delta_move.dy
+      final_pose.pose.position.z = goal.delta_move.dx
 
-      q_change = quaternion_from_euler(-.5, 0, 0) 
+      q_change = quaternion_from_euler(goal.delta_move.dtheta, 0, 0) 
       final_pose.pose.orientation.x = q_change[0]
       final_pose.pose.orientation.y = q_change[1]
       final_pose.pose.orientation.z = q_change[2]
       final_pose.pose.orientation.w = q_change[3]
-      # final_pose = tf2_geometry_msgs.do_transform_pose(final_pose, self.transform1)
+      
       plan, fraction = self.arm_group.compute_cartesian_path([final_pose.pose], 0.01,2)   
       success = self.arm_group.execute(plan)
-      # Plan
-      # self.arm_group.plan(final_pose)
-      # self.arm_group.go()
+
+      if success:
+        self.move_server.set_succeeded()
+      else:
+        self.move_server.set_aborted()
 
 
 
 
     def main(self):
       
-      self.mod_position()
 
 
       rospy.spin()
 
 
 if __name__ == '__main__':
-    rospy.init_node('cable_trace', anonymous=True)
+    rospy.init_node('move_arm', anonymous=True)
     cable_trace = CableTrace()
     cable_trace.main()
