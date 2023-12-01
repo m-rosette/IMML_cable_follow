@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 """
 This module contains a node to test the system hardware, and publish a message if everything is good. Takes in
 command line arguments for the configuration of the system.

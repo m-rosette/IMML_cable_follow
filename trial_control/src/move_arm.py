@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 import rospy
 import moveit_commander
@@ -36,10 +36,10 @@ class CableTrace:
         
         self.arm_group.allow_replanning(1)  
 
-        tfBuffer = tf2_ros.Buffer()
-        self.listener = tf2_ros.TransformListener(tfBuffer)
+        # tfBuffer = tf2_ros.Buffer()
+        # self.listener = tf2_ros.TransformListener(tfBuffer)
 
-        self.transform1 = tfBuffer.lookup_transform("tool0", 'ee_gripper', rospy.Time.now(), rospy.Duration(1.0))
+        # self.transform1 = tfBuffer.lookup_transform("tool0", 'ee_gripper', rospy.Time.now(), rospy.Duration(1.0))
         # print(self.transform1)
         # self.transform = tfBuffer.lookup_transform("base_link", 'tool0', rospy.Time.now(), rospy.Duration(1.0))
         # print(self.transform)
@@ -104,17 +104,17 @@ class CableTrace:
       # hi = raw_input()
       # # self.arm_group.plan(final_pose.pose)
 
-      self.arm_group.set_pose_reference_frame("ee_gripper")
+      self.arm_group.set_pose_reference_frame("tool0")
       final_pose = PoseStamped()
       # final_pose.pose.position.z -= .05
       # next_pose = tf2_geometry_msgs.do_transform_pose(final_pose, self.transform1)
       # last_pose = tf2_geometry_msgs.do_transform_pose(next_pose, self.transform)
       # print(last_pose)
-      # q_change = quaternion_from_euler(-.5, 0, 0) 
-      # final_pose.pose.orientation.x = q_change[0]
-      # final_pose.pose.orientation.y = q_change[1]
-      # final_pose.pose.orientation.z = q_change[2]
-      # final_pose.pose.orientation.w = q_change[3]
+      q_change = quaternion_from_euler(-.5, 0, 0) 
+      final_pose.pose.orientation.x = q_change[0]
+      final_pose.pose.orientation.y = q_change[1]
+      final_pose.pose.orientation.z = q_change[2]
+      final_pose.pose.orientation.w = q_change[3]
       # final_pose = tf2_geometry_msgs.do_transform_pose(final_pose, self.transform1)
       plan, fraction = self.arm_group.compute_cartesian_path([final_pose.pose], 0.01,2)   
       success = self.arm_group.execute(plan)

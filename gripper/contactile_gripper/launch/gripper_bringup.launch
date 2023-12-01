@@ -43,6 +43,6 @@
 
 <node pkg="contactile_gripper" name="control" type="control_node.py" output="screen"/>
 
-<node pkg="contactile_gripper" name="UI" type="ui_node.py" launch-prefix="xterm -e" output="screen"/>
+<!-- <node pkg="contactile_gripper" name="UI" type="ui_node.py" launch-prefix="xterm -e" output="screen"/> -->
 
 </launch>
