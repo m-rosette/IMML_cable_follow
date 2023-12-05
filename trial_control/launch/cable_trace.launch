@@ -1,0 +1,17 @@
+<launch>
+<arg name="node_start_delay" default="1.0" />  
+<!-- Launch the UR Driver -->
+<include file="$(find trial_control)/launch/arm_bringup.launch">
+  <!-- all vars that included.launch requires must be set -->
+</include>
+<include file="$(find contactile_gripper)/launch/gripper_bringup.launch">
+  <!-- all vars that included.launch requires must be set -->
+</include>
+
+<node pkg="trial_control" name="move_arm" type="move_arm.py" output="screen"/>
+
+<node pkg="trial_control" name="get_pic" type="get_picture.py" output="screen"/>
+<node pkg="lbc_project" name="move_server" type="move_server.py" output="screen" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' "/>
+<node pkg="trial_control" name="record" type="record.py" output="screen" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' "/>
+<node pkg="trial_control" name="cable_trace" type="cable_trace.py" launch-prefix="xterm -e" output="screen"/>
+</launch>

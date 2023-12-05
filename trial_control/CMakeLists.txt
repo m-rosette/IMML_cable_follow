@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib
   sensor_msgs
   message_generation
+  lbc_project
 )
 
 ## System dependencies are found with CMake's conventions
@@ -107,6 +108,7 @@ catkin_package(
    std_msgs 
    actionlib_msgs
    message_runtime
+   lbc_project
 )
 
 ###########

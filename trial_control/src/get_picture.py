@@ -27,22 +27,23 @@ class TakePicture:
         #capture frame and save it under trial number
         cap = cv2.VideoCapture(2) 
         ret,frame = cap.read()
-        cv2.imwrite('images/' + msg.trial_num + '.jpg',frame)
+        cv2.imwrite('/root/images/' + msg.trial_num + '.jpg',frame)
+        cv2.imwrite('/root/images/' + "temp_0" + '.jpg',frame)
         cap.release()
 
-        #get mask and skeleton estimate
-        skeleton, mask = self.process(frame)
-        try:
-            self.skeleton_image_message = self.bridge.cv2_to_imgmsg(skeleton, "passthrough")
-            self.mask_image_message = self.bridge.cv2_to_imgmsg(mask, "passthrough")
-            self.original_image_message = self.bridge.cv2_to_imgmsg(frame, "bgr8")
-        except CvBridgeError as e:
-            print(e)
+        # #get mask and skeleton estimate
+        # skeleton, mask = self.process(frame)
+        # try:
+        #     self.skeleton_image_message = self.bridge.cv2_to_imgmsg(skeleton, "passthrough")
+        #     self.mask_image_message = self.bridge.cv2_to_imgmsg(mask, "passthrough")
+        #     self.original_image_message = self.bridge.cv2_to_imgmsg(frame, "bgr8")
+        # except CvBridgeError as e:
+        #     print(e)
 
-        #publish images
-        self.skeleton_pub.publish(self.skeleton_image_message)
-        self.mask_pub.publish(self.mask_image_message)
-        self.original_pub.publish(self.original_image_message)
+        # #publish images
+        # self.skeleton_pub.publish(self.skeleton_image_message)
+        # self.mask_pub.publish(self.mask_image_message)
+        # self.original_pub.publish(self.original_image_message)
         return PictureTriggerResponse()
     
     def process(self, im):
@@ -89,5 +90,5 @@ class TakePicture:
 
 if __name__ == '__main__':
     cable_follow = TakePicture()
-    rospy.init_node('cable_follow', anonymous=True)
+    rospy.init_node('get_pic', anonymous=True)
     rospy.spin()

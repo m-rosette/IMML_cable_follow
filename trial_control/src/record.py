@@ -7,11 +7,12 @@ import numpy as np
 from papillarray_ros_v2.msg import SensorState
 from time import sleep
 import csv
-from collections import OrderedDict
 from trial_control.msg import RecordAction, RecordGoal, RecordFeedback, RecordResult
 from actionlib import SimpleActionServer
 from copy import deepcopy as copy
 import threading
+import time
+import shutil
 
 
 # Serves as an action client that starts data recording (saves data just to csv)
@@ -38,6 +39,7 @@ class Record:
         # Create action server
         self.record_server = SimpleActionServer("record_server", RecordAction, execute_cb=self.action_callback, auto_start=False)
         self.record_server.start()
+        self.result = RecordResult()
         rospy.loginfo("Everything up!")
 
         self.storage_directory = '/root/data'
@@ -51,9 +53,12 @@ class Record:
 
         # Combine all of the data into one dictionary
         self.mutex.acquire()
-        combined_dict = OrderedDict(copy(self.position).items() + copy(self.tactile_0).items() + copy(self.tactile_1).items())
+        
+        combined_dict = copy(self.position)
+        combined_dict.update(copy(self.tactile_0))#.update(copy(self.tactile_1))
+        combined_dict.update(copy(self.tactile_1))
         self.mutex.release()
-
+        t1 = time.time()
         # print("tactile: ", self.tactile_0)
         with open('/root/data/' + str(self.file_name) + '.csv', 'w') as csvfile:
             # Write the header
@@ -62,14 +67,34 @@ class Record:
 
             while not self.record_server.is_preempt_requested() and not rospy.is_shutdown():
                 # Combine all of the data into one dictionary
+                t2 = time.time()
+                delta = t2-t1
+                if delta > 2.5:
+                    break
                 self.mutex.acquire()
-                combined_dict = OrderedDict(copy(self.position).items() + copy(self.tactile_0).items() + copy(self.tactile_1).items())
+                combined_dict = copy(self.position)
+                combined_dict.update(copy(self.tactile_0))#.update(copy(self.tactile_1))
+                combined_dict.update(copy(self.tactile_1))
                 self.mutex.release()
                 w.writerow(combined_dict)
                 self.r.sleep()
+        shutil.copy('/root/data/' + str(self.file_name) + '.csv', '/root/data/temp_0.csv')
+        # Read in csv and convert to float32 array
+        my_data = np.genfromtxt('/root/data/' + str(self.file_name) + '.csv', delimiter=',')
+        # Get just the last 30 rows
+        my_data = my_data[-30:].astype(dtype=np.float32)
+        # Flatten
+        flattened_data = my_data.flatten()
+        print(flattened_data)
 
-            self.record_server.set_preempted()
-            rospy.loginfo("Recording stopped.")
+        # Convert to result msg type
+        self.result.data = flattened_data
+        print(self.result.data.shape)
+    
+
+        # Return the data
+        self.record_server.set_succeeded(self.result)
+        rospy.loginfo("Recording stopped.")
 
     def pos_callback(self, pos_in):
         # Saves the subscribed gripper position data to variable
@@ -79,7 +104,7 @@ class Record:
         # Saves the subscribed tactile 0 data to variable
         #self.tactile_0 = tac_in
         self.mutex.acquire()
-        self.tactile_0 = OrderedDict() 
+        self.tactile_0 = {} 
         for i in range(8):
             
             self.tactile_0['0_dX_'+str(i)] = tac_in.pillars[i].dX
@@ -101,7 +126,7 @@ class Record:
     def tactile_1_callback(self, tac_in):
         # Saves the subscribed tactile 1 data to variable
         self.mutex.acquire()
-        self.tactile_1 = OrderedDict() 
+        self.tactile_1 = {}
         for i in range(8):
             
             self.tactile_1['1_dX_'+str(i)] = tac_in.pillars[i].dX
@@ -125,10 +150,10 @@ class Record:
         Initializes all of the keys in each ordered dictionary. This ensures the header and order is correct even if recording starts before data is published.
         """
         # Position 
-        self.position = OrderedDict({'gripper_pos': None})
+        self.position = {'gripper_pos': None}
         # Tactile sensor 
-        self.tactile_0 = OrderedDict()
-        self.tactile_1 = OrderedDict()
+        self.tactile_0 = {}
+        self.tactile_1 = {}
 
         for i in range(8):
             self.tactile_0['0_dX_'+str(i)] = None

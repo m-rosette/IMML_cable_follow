@@ -2,7 +2,7 @@
 string file_name
 ---
 #result
-bool result
+float32[] data
 ---
 #feedback
 bool status

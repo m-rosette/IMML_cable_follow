@@ -14,6 +14,8 @@ import tf2_geometry_msgs  # **Do not use geometry_msgs. Use this instead for Pos
 from tf.transformations import *
 from copy import deepcopy
 from actionlib import SimpleActionServer
+import numpy as np
+
 
 # General idea - this is high level trial control
 
@@ -60,17 +62,20 @@ class CableTrace:
 
       self.arm_group.set_pose_reference_frame("tool0")
       final_pose = PoseStamped()
-      final_pose.pose.position.y = goal.delta_move.dy
-      final_pose.pose.position.z = goal.delta_move.dx
+      final_pose.pose.position.y = goal.delta_move.dx/1000
+      final_pose.pose.position.z = goal.delta_move.dy/1000
 
-      q_change = quaternion_from_euler(goal.delta_move.dtheta, 0, 0) 
+      q_change = quaternion_from_euler(-np.deg2rad(goal.delta_move.dtheta), 0, 0) 
       final_pose.pose.orientation.x = q_change[0]
       final_pose.pose.orientation.y = q_change[1]
       final_pose.pose.orientation.z = q_change[2]
       final_pose.pose.orientation.w = q_change[3]
       
-      plan, fraction = self.arm_group.compute_cartesian_path([final_pose.pose], 0.01,2)   
-      success = self.arm_group.execute(plan)
+      plan, fraction = self.arm_group.compute_cartesian_path([final_pose.pose], 0.01,2) 
+      if fraction > .99:  
+        success = self.arm_group.execute(plan)
+      else: 
+        success = False
 
       if success:
         self.move_server.set_succeeded()

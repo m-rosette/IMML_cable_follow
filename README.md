@@ -40,3 +40,17 @@ rosrun trial_control cable_follow_trials.py
 pip install setuptools -U
 python2 -m pip install install protobuf==3.17.3
 python2 -m pip install install tensorflow-gpu==1.12.0
+
+
+
+
+TO LAUNCH:
+roslaunch trial_control arm_bringup
+rosrun trial_control move_arm.py
+rosrun trial_control cable_trace.py
+rosrun record?????
+
+TODO 
+Implement tensorflow
+We need to update gripper pose as tool0 in URDF
+
