@@ -1,5 +1,7 @@
-# ROB 537 Cable Following
-## Kyle, Marcus, Jostan, Keegan
+# Cable Following
+## Marcus
+
+This project is designed to have a tactile sensor equipped gripper follow a cable. This is a continuation of the work started in an OSU ROB 537 final project.
 
 ### How to use
 First, connect the gripper via USB. If using a Docker container, be sure to connect the USB before starting the container (or restart the container).
@@ -14,7 +16,6 @@ This will identify ports for the Contactille sensors and Dynamixel controlller, 
 
 
 Credit to Kyle Mathenia for the gripper ROS code. Check out his original code [here](https://github.com/kylemathenia/IMML_Contactile_Gripper).
-
 
 Need to add pip install ordereddict
 
