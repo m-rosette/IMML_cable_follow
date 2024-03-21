@@ -1,1 +1,0 @@
-<node pkg="contactile_gripper" name="sys_test" type="sys_test_node.py" output="screen" args=TBD/>

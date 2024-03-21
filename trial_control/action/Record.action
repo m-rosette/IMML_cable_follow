@@ -1,8 +1,0 @@
-#goal
-string file_name
----
-#result
-bool result
----
-#feedback
-bool status

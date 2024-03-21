@@ -1,0 +1,10 @@
+# DualSetOperatingMode.srv
+
+uint8 id1
+uint8 id2
+uint8 operating_mode
+int32 operation_target1
+int32 operation_target2
+
+---
+bool success

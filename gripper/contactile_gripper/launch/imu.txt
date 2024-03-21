@@ -1,1 +1,0 @@
-<node pkg="contactile_gripper" name="imu" type="IMU_node.py"/>

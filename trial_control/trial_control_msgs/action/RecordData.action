@@ -1,0 +1,8 @@
+# goal
+string filename
+---
+# result
+bool result
+---
+# feedback
+bool status

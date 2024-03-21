@@ -1,0 +1,8 @@
+# Constants
+# Request
+uint8 id
+uint8 operating_mode
+int32 operation_target
+---
+# Response
+bool success
