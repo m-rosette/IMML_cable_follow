@@ -1,6 +1,6 @@
 #include "motor_interface_client.hpp"
 
-MotorInterfaceClient::MotorInterfaceClient(const std::string & node_name, uint8_t operating_mode, uint32_t operation_target)
+MotorInterfaceClient::MotorInterfaceClient(const std::string & node_name, uint8_t operating_mode, uint32_t goal_current, uint32_t goal_position)
     : Node(node_name)
 {
     set_operating_mode_client_ = this->create_client<dynamixel_control_msgs::srv::SetOperatingMode>("set_operating_mode");
@@ -14,34 +14,25 @@ MotorInterfaceClient::MotorInterfaceClient(const std::string & node_name, uint8_
     }
 
     // Start asynchronous task to send service requests for both motors
-    auto future = std::async(std::launch::async, &MotorInterfaceClient::sendSetOperatingModeRequests, this, operating_mode, operation_target);
+    auto future = std::async(std::launch::async, &MotorInterfaceClient::sendSetOperatingModeRequests, this, operating_mode, goal_current, goal_position);
 
     // Wait for the future to complete
     future.wait();
 }
 
-void MotorInterfaceClient::sendSetOperatingModeRequests(uint8_t operating_mode, uint32_t operation_target)
+void MotorInterfaceClient::sendSetOperatingModeRequests(uint8_t operating_mode, uint32_t goal_current, uint32_t goal_position)
 {
     // Send service requests for both motors
-    sendSetOperatingModeRequest(1, operating_mode, operation_target);
-    sendSetOperatingModeRequest(2, operating_mode, operation_target);
+    sendSetOperatingModeRequest(1, operating_mode, goal_current, goal_position);
 }
 
-void MotorInterfaceClient::sendSetOperatingModeRequest(uint8_t id, uint8_t operating_mode, uint32_t operation_target)
+void MotorInterfaceClient::sendSetOperatingModeRequest(uint8_t id, uint8_t operating_mode, uint32_t goal_current, uint32_t goal_position)
 {
     auto request = std::make_shared<dynamixel_control_msgs::srv::SetOperatingMode::Request>();
     request->id = id;
     request->operating_mode = operating_mode;
-
-    // Calculate the modified (inverted) operation target for the second motor
-    uint32_t modified_operation_target = operation_target;
-    if (id == 2 && operating_mode == 3) { // If it's the second motor and in position mode
-        modified_operation_target = 4025 - operation_target; // Calculate the modified target position
-    }
-    else if (id == 2 && operating_mode == 0) { // If it's the second motor and in position mode
-        modified_operation_target = - operation_target; // Make the operation_target negative
-    }
-    request->operation_target = modified_operation_target;
+    request->goal_current = goal_current;
+    request->goal_position = goal_position;
 
     auto future = set_operating_mode_client_->async_send_request(request);
 
@@ -66,8 +57,9 @@ int main(int argc, char * argv[])
 {
     rclcpp::init(argc, argv);
     uint8_t operating_mode = std::stoi(argv[1]);
-    uint32_t operation_target = std::stoi(argv[2]);
-    auto node = std::make_shared<MotorInterfaceClient>("motor_interface_client", operating_mode, operation_target);
+    uint32_t goal_current = std::stoi(argv[2]);
+    uint32_t goal_position = std::stoi(argv[3]);
+    auto node = std::make_shared<MotorInterfaceClient>("motor_interface_client", operating_mode, goal_current, goal_position);
     rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;

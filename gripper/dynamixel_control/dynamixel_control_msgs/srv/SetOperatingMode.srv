@@ -2,7 +2,8 @@
 # Request
 uint8 id
 uint8 operating_mode
-int32 operation_target
+int32 goal_current
+int32 goal_position
 ---
 # Response
 bool success

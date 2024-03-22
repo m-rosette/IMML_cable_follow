@@ -7,11 +7,11 @@
 class MotorInterfaceClient : public rclcpp::Node
 {
 public:
-    explicit MotorInterfaceClient(const std::string & node_name, uint8_t operating_mode, uint32_t operation_target);
+    explicit MotorInterfaceClient(const std::string & node_name, uint8_t operating_mode, uint32_t goal_current, uint32_t goal_position);
 
 private:
-    void sendSetOperatingModeRequests(uint8_t operating_mode, uint32_t operation_target);
-    void sendSetOperatingModeRequest(uint8_t id, uint8_t operating_mode, uint32_t operation_target);
+    void sendSetOperatingModeRequests(uint8_t operating_mode, uint32_t goal_current, uint32_t goal_position);
+    void sendSetOperatingModeRequest(uint8_t id, uint8_t operating_mode, uint32_t goal_current, uint32_t goal_position);
 
     rclcpp::Client<dynamixel_control_msgs::srv::SetOperatingMode>::SharedPtr set_operating_mode_client_;
 };

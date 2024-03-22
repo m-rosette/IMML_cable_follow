@@ -4,12 +4,10 @@
 #include <memory>
 #include <string>
 
-// #include "dynamixel_sdk/dynamixel_sdk.h"
 #include "dynamixel_sdk_custom_interfaces/msg/set_position.hpp"
 #include "dynamixel_sdk_custom_interfaces/srv/get_position.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "rcutils/cmdline_parser.h"
-
 #include "motor_interface.hpp"
 
 // Control table address for X series (except XL-320)
@@ -113,7 +111,10 @@ ReadWriteNode::ReadWriteNode()
       uint8_t dxl_error = 0;
       uint8_t dxl_id = request->id;
       uint8_t operating_mode = request->operating_mode;
-      uint32_t operation_target = request->operation_target;
+      uint32_t goal_current = request->goal_current;
+      uint32_t goal_position = request->goal_position;
+
+      RCLCPP_INFO(this->get_logger(), "[Operating Mode: %d] [Goal Current: %d] [Goal Position: %d]", operating_mode, goal_current, goal_position);
 
       // Disable Torque of DYNAMIXEL
       dxl_comm_result = packetHandler->write1ByteTxRx(
@@ -142,17 +143,19 @@ ReadWriteNode::ReadWriteNode()
         &dxl_error
       );
 
+      // Current mode
       if (operating_mode == 0) {
         // Set goal current of DYNAMIXEL
         dxl_comm_result = packetHandler->write2ByteTxRx(
           portHandler,
           dxl_id,
           ADDR_GOAL_CURRENT,
-          operation_target,
+          goal_current,
           &dxl_error
         );
       }
 
+      // Position mode
       if (operating_mode == 3) {
         // Write Goal Position (length : 4 bytes)
         // When writing 2 byte data to AX / MX(1.0), use write2ByteTxRx() instead.
@@ -160,7 +163,29 @@ ReadWriteNode::ReadWriteNode()
           portHandler,
           dxl_id,
           ADDR_GOAL_POSITION,
-          operation_target,
+          goal_position,
+          &dxl_error
+        );
+      }
+
+      // Current based position mode
+      if (operating_mode == 5) {
+        // Set goal current of DYNAMIXEL
+        dxl_comm_result = packetHandler->write2ByteTxRx(
+          portHandler,
+          dxl_id,
+          ADDR_GOAL_CURRENT,
+          goal_current,
+          &dxl_error
+        );
+
+        // Write Goal Position (length : 4 bytes)
+        // When writing 2 byte data to AX / MX(1.0), use write2ByteTxRx() instead.
+        dxl_comm_result = packetHandler->write4ByteTxRx(
+          portHandler,
+          dxl_id,
+          ADDR_GOAL_POSITION,
+          goal_position,
           &dxl_error
         );
       }
@@ -173,13 +198,16 @@ ReadWriteNode::ReadWriteNode()
         response->success = false;
       } else {
         if (operating_mode == 0) {
-          // RCLCPP_INFO(this->get_logger(), "Operating mode set to: Current");
-          RCLCPP_INFO(this->get_logger(), "Set [ID: %d] [Goal Current: %d]", dxl_id, operation_target);
+          RCLCPP_INFO(this->get_logger(), "Set [ID: %d] [Goal Current: %d]", dxl_id, goal_current);
         }
         if (operating_mode == 3) {
-          // RCLCPP_INFO(this->get_logger(), "Operating mode set to: Position");
-          RCLCPP_INFO(this->get_logger(), "Set [ID: %d] [Goal Position: %d]", dxl_id, operation_target);
+          RCLCPP_INFO(this->get_logger(), "Set [ID: %d] [Goal Position: %d]", dxl_id, goal_position);
         }
+        if (operating_mode == 5) {
+          RCLCPP_INFO(this->get_logger(), "Set [ID: %d] [Goal Current: %d]", dxl_id, goal_current);
+          RCLCPP_INFO(this->get_logger(), "Set [ID: %d] [Goal Position: %d]", dxl_id, goal_position);
+        }
+
         response->success = true;
       }
     };
