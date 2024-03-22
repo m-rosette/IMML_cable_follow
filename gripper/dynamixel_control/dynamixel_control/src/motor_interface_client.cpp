@@ -1,5 +1,6 @@
 #include "motor_interface_client.hpp"
 
+
 MotorInterfaceClient::MotorInterfaceClient(uint8_t operating_mode, uint32_t goal_current, uint32_t goal_position)
     : Node("motor_client"),
       operating_mode_(operating_mode),
@@ -25,20 +26,25 @@ MotorInterfaceClient::MotorInterfaceClient(uint8_t operating_mode, uint32_t goal
     request->id = 1;
     request->operating_mode = operating_mode_;
 
-    // ---------------- CHANGE AS NEEDED ----------------
-    // Set bounds for operation_target
-    uint32_t upper_pos_bound = 500;
-    uint32_t lower_pos_bound = 50;
+    // Set position bounds
+    uint32_t upper_pos_bound = 3300;
+    uint32_t lower_pos_bound = 1290;
+
+    // Set current bounds
     uint32_t upper_current_bound = 10;
-    uint32_t lower_current_bound = 0.5;
+    uint32_t lower_current_bound = 3;
+
+    // Set current-based position bounds
+    uint32_t upper_pos_bound_cb = 103390;
+    uint32_t lower_pos_bound_cb = 101280;
 
     // Check bounds on position
-    if (goal_position_ > upper_pos_bound)
+    if (operating_mode_ == 3 && goal_position_ > upper_pos_bound)
     {
         RCLCPP_WARN(this->get_logger(), "Position upper bound exceeded - capping value. [Goal Position: %d]", upper_pos_bound);
         goal_position_ = upper_pos_bound;
     }
-    else if (goal_position_ < lower_pos_bound)
+    else if (operating_mode_ == 3 && goal_position_ < lower_pos_bound)
     {
         RCLCPP_WARN(this->get_logger(), "Position lower bound exceeded - capping value. [Goal Position: %d]", lower_pos_bound);
         goal_position_ = lower_pos_bound;
@@ -54,6 +60,18 @@ MotorInterfaceClient::MotorInterfaceClient(uint8_t operating_mode, uint32_t goal
     {
         RCLCPP_WARN(this->get_logger(), "Current lower bound exceeded - capping value. [Goal Current: %d]", lower_current_bound);
         goal_current_ = lower_current_bound;
+    }
+
+    // Check bounds on current-based position
+    if (operating_mode_ == 5 && goal_position_ > upper_pos_bound_cb)
+    {
+        RCLCPP_WARN(this->get_logger(), "Position upper bound exceeded - capping value. [Goal Position: %d]", upper_pos_bound_cb);
+        goal_position_ = upper_pos_bound_cb;
+    }
+    else if (operating_mode_ == 5 && goal_position_ < lower_pos_bound_cb)
+    {
+        RCLCPP_WARN(this->get_logger(), "Position lower bound exceeded - capping value. [Goal Position: %d]", lower_pos_bound_cb);
+        goal_position_ = lower_pos_bound_cb;
     }
 
     request->goal_current = goal_current_;
