@@ -30,7 +30,6 @@ private:
 
   int present_position;
   int goal_current;
-  // rclcpp::TimerBase::SharedPtr goal_current_timer;
 };
 
-#endif  // READ_WRITE_NODE_HPP_
+#endif // READ_WRITE_NODE_HPP_

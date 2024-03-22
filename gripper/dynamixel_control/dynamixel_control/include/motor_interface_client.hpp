@@ -7,13 +7,15 @@
 class MotorInterfaceClient : public rclcpp::Node
 {
 public:
-    explicit MotorInterfaceClient(const std::string & node_name, uint8_t operating_mode, uint32_t goal_current, uint32_t goal_position);
+    MotorInterfaceClient(uint8_t operating_mode, uint32_t goal_current, uint32_t goal_position);
 
 private:
-    void sendSetOperatingModeRequests(uint8_t operating_mode, uint32_t goal_current, uint32_t goal_position);
-    void sendSetOperatingModeRequest(uint8_t id, uint8_t operating_mode, uint32_t goal_current, uint32_t goal_position);
+    void responseCallback(rclcpp::Client<dynamixel_control_msgs::srv::SetOperatingMode>::SharedFuture future);
 
     rclcpp::Client<dynamixel_control_msgs::srv::SetOperatingMode>::SharedPtr set_operating_mode_client_;
+    uint8_t operating_mode_;
+    uint32_t goal_current_;
+    uint32_t goal_position_;
 };
 
 #endif /* MOTOR_INTERFACE_CLIENT_HPP_ */
