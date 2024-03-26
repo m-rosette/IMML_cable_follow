@@ -12,7 +12,7 @@ import time
 
 from std_msgs.msg import Int64, Float64
 from sensor_interfaces.msg import SensorState
-from gripper_msgs.action import RecordData
+from trial_control_msgs.action import RecordData
 
 
 

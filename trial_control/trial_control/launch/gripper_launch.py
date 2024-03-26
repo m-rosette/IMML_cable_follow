@@ -23,8 +23,8 @@ def generate_launch_description():
         # Start the dual dynamixel motor interface
         Node(
             package='dynamixel_control',
-            executable='dual_motor_interface',
-            name='dual_motor_interface',
+            executable='motor_interface',
+            name='motor_interface',
         ),
 
         # Start the recording node

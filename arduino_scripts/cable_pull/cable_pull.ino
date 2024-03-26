@@ -12,13 +12,16 @@ AccelStepper stepper(AccelStepper::DRIVER, STEP_PIN, DIR_PIN);
 int buttonState = 0;
 int lastButtonState = 0;
 
+// Initialize initial seatment
+String command = "SEATED";
+
 void setup() {
   // Set up stepper motor
-  stepper.setMaxSpeed(1000); // Set your desired maximum speed
+  stepper.setMaxSpeed(200); // Set your desired maximum speed
   stepper.setAcceleration(500); // Set your desired acceleration
   
   // Set up button pin
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  pinMode(BUTTON_PIN, OUTPUT);
   
   // Initialize serial communication
   Serial.begin(115200);
@@ -31,11 +34,11 @@ void loop() {
   if (reading != lastButtonState) {
     if (reading == LOW) {
       // Button is pressed, send status to serial
-      Serial.println("SEATED");
-    } else {
-      // Button is released, send status to serial
       Serial.println("UNSEATED");
       stepper.stop(); // Stop the motor
+    } else {
+      // Button is released, send status to serial
+      Serial.println("SEATED");
     }
     delay(50); // Debounce delay
   }
@@ -43,14 +46,15 @@ void loop() {
   lastButtonState = reading;
 
   // Check for serial commands
-  while (Serial.available() > 0) {
-    String command = Serial.readString();
+  if (Serial.available() > 0) {
+    command = Serial.readStringUntil('\n');
+    Serial.println(command);
     if (command == "PULL") {
       // Move motor in one direction
-      stepper.moveTo(1000); // Adjust the steps according to your requirement
+      stepper.moveTo(1500); // Adjust the steps according to your requirement
     } else if (command == "HOME") {
       // Move motor in the other direction
-      stepper.moveTo(-1000); // Adjust the steps according to your requirement
+      stepper.moveTo(-1500); // Adjust the steps according to your requirement
     }
   }
 

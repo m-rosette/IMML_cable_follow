@@ -1,0 +1,5 @@
+# CableState (seated or unseated)
+
+---
+# Response
+string state
