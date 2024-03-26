@@ -21,6 +21,7 @@ ament_target_dependencies(motor_interface
   dynamixel_control_msgs
   dynamixel_sdk
   rclcpp
+  std_msgs
 )
 
 add_executable(motor_interface_client src/motor_interface_client.cpp)
@@ -29,6 +30,7 @@ ament_target_dependencies(motor_interface_client
   dynamixel_control_msgs
   dynamixel_sdk
   rclcpp
+  std_msgs
 )
 
 add_executable(scratch_service_client src/scratch_service_client.cpp)

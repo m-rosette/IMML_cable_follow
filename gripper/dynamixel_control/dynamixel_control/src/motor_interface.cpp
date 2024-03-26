@@ -7,6 +7,7 @@
 #include "dynamixel_sdk_custom_interfaces/msg/set_position.hpp"
 #include "dynamixel_sdk_custom_interfaces/srv/get_position.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/int64.hpp"
 #include "rcutils/cmdline_parser.h"
 #include "motor_interface.hpp"
 
@@ -42,6 +43,9 @@ ReadWriteNode::ReadWriteNode()
 
   const auto QOS_RKL10V =
     rclcpp::QoS(rclcpp::KeepLast(qos_depth)).reliable().durability_volatile();
+
+  // Initialize the present position publisher
+  present_position_publisher_ = this->create_publisher<std_msgs::msg::Int64>("present_position", 10);
 
   set_position_subscriber_ =
     this->create_subscription<SetPosition>(
@@ -111,10 +115,10 @@ ReadWriteNode::ReadWriteNode()
       uint8_t dxl_error = 0;
       uint8_t dxl_id = request->id;
       uint8_t operating_mode = request->operating_mode;
-      uint32_t goal_current = request->goal_current;
+      double goal_current = request->goal_current;
       uint32_t goal_position = request->goal_position;
 
-      RCLCPP_INFO(this->get_logger(), "[Operating Mode: %d] [Goal Current: %d] [Goal Position: %d]", operating_mode, goal_current, goal_position);
+      RCLCPP_INFO(this->get_logger(), "[Operating Mode: %d] [Goal Current: %f] [Goal Position: %d]", operating_mode, goal_current, goal_position);
 
       // Disable Torque of DYNAMIXEL
       dxl_comm_result = packetHandler->write1ByteTxRx(
@@ -198,13 +202,13 @@ ReadWriteNode::ReadWriteNode()
         response->success = false;
       } else {
         if (operating_mode == 0) {
-          RCLCPP_INFO(this->get_logger(), "Set [ID: %d] [Goal Current: %d]", dxl_id, goal_current);
+          RCLCPP_INFO(this->get_logger(), "Set [ID: %d] [Goal Current: %f]", dxl_id, goal_current);
         }
         if (operating_mode == 3) {
           RCLCPP_INFO(this->get_logger(), "Set [ID: %d] [Goal Position: %d]", dxl_id, goal_position);
         }
         if (operating_mode == 5) {
-          RCLCPP_INFO(this->get_logger(), "Set [ID: %d] [Goal Current: %d]", dxl_id, goal_current);
+          RCLCPP_INFO(this->get_logger(), "Set [ID: %d] [Goal Current: %f]", dxl_id, goal_current);
           RCLCPP_INFO(this->get_logger(), "Set [ID: %d] [Goal Position: %d]", dxl_id, goal_position);
         }
 
@@ -217,6 +221,40 @@ ReadWriteNode::ReadWriteNode()
 
 ReadWriteNode::~ReadWriteNode()
 {
+}
+
+void ReadWriteNode::publishPresentPosition()
+{
+  // Read Present Position (length : 4 bytes) and Convert uint32 -> int32
+  // When reading 2 byte data from AX / MX(1.0), use read2ByteTxRx() instead.
+  uint8_t dxl_error = 0;
+  uint8_t dxl_id = BROADCAST_ID;
+  dxl_comm_result = packetHandler->read4ByteTxRx(
+    portHandler,
+    dxl_id,
+    ADDR_PRESENT_POSITION,
+    reinterpret_cast<uint32_t *>(&present_position),
+    &dxl_error
+  );
+
+  if (dxl_comm_result == COMM_SUCCESS && dxl_error == 0) {
+    std_msgs::msg::Int64 present_position_msg;
+    present_position_msg.data = present_position;
+    present_position_publisher_->publish(present_position_msg);
+    RCLCPP_INFO(
+      this->get_logger(),
+      "Published [ID: %d] [Present Position: %d]",
+      dxl_id,
+      present_position
+    );
+  } else {
+    RCLCPP_ERROR(
+      this->get_logger(),
+      "Failed to read present position for ID: %d. Error: %s",
+      dxl_id,
+      packetHandler->getTxRxResult(dxl_comm_result)
+    );
+  }
 }
 
 void setupDynamixel(uint8_t dxl_id)

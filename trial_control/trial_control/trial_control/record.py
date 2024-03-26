@@ -10,6 +10,7 @@ import threading
 
 import time
 
+from std_msgs.msg import Int64, Float64
 from sensor_interfaces.msg import SensorState
 from gripper_msgs.action import RecordData
 
@@ -18,7 +19,7 @@ from gripper_msgs.action import RecordData
 class Record(Node):
     def __init__(self):
         super().__init__('record')
-        self.storage_directory = '/home/marcus/classes/rob599/project_ws/src/rob599_project/trial_control/gripper/resource/'
+        self.storage_directory = '/home/marcus/IMML/ros2_ws/src/IMML_cable_follow/trial_control/trial_control/resource/'
 
         self.mutex = threading.Lock()
 
@@ -26,6 +27,10 @@ class Record(Node):
 
         # Initialize dictionaries to store data from subscribers
         self.initialize_tactile_dict()
+
+        # Subscribe to gripper position and current 
+        self.gripper_pos_sub = self.create_subscription(Int64, 'present_position', self.gripper_pos_callback, 10)
+        self.gripper_current_sub = self.create_subscription(Float64, 'motor_current', self.gripper_current_callback, 10)
 
         # Subscribe to tactile sensor feedback
         self.tactile_0_sub = self.create_subscription(SensorState, 'hub_0/sensor_0', self.tactile_0_callback, 10)
@@ -79,6 +84,8 @@ class Record(Node):
         """
         combined_dict = OrderedDict()
         self.mutex.acquire()
+        combined_dict.update(self.gripper_position)
+        combined_dict.update(self.gripper_current)
         combined_dict.update(self.tactile_0)
         combined_dict.update(self.tactile_1)
         self.mutex.release()
@@ -87,7 +94,7 @@ class Record(Node):
     def tactile_0_callback(self, tac_msg):
         # Saves the subscribed tactile 0 data to variable
         self.mutex.acquire()
-        for i in range(8):
+        for i in range(9):
             self.tactile_0[f'0_dX_{i}'] = tac_msg.pillars[i].dx
             self.tactile_0[f'0_dY_{i}'] = tac_msg.pillars[i].dy
             self.tactile_0[f'0_dZ_{i}'] = tac_msg.pillars[i].dz
@@ -107,7 +114,7 @@ class Record(Node):
     def tactile_1_callback(self, tac_msg):
         # Saves the subscribed tactile 1 data to variable
         self.mutex.acquire()
-        for i in range(8):
+        for i in range(9):
             self.tactile_1[f'1_dX_{i}'] = tac_msg.pillars[i].dx
             self.tactile_1[f'1_dY_{i}'] = tac_msg.pillars[i].dy
             self.tactile_1[f'1_dZ_{i}'] = tac_msg.pillars[i].dz
@@ -123,16 +130,25 @@ class Record(Node):
         self.tactile_1['1_is_ref_loaded'] = tac_msg.is_ref_loaded
         self.tactile_1['1_is_contact'] = tac_msg.is_contact
         self.mutex.release()
+    
+    def gripper_pos_callback(self, pos_msg):
+        # Saves the subscribed gripper position data to variable
+        self.gripper_position['gripper_pos'] = pos_msg.data
+
+    def gripper_current_callback(self, current_msg):
+        # Saves the subscribed gripper current data to variable
+        self.gripper_current['gripper_current'] = current_msg.data
 
     def initialize_tactile_dict(self):
         """
         Initializes all of the keys in each ordered dictionary. This ensures the header and order is correct even if recording starts before data is published.
         """
+        self.gripper_position = OrderedDict({'gripper_pos': None})
+        self.gripper_current = OrderedDict({'gripper_current': None})
         self.tactile_0 = OrderedDict()
         self.tactile_1 = OrderedDict()
-        #  edit made by kp for time
         
-        for i in range(8):
+        for i in range(9):
             self.tactile_0[f'0_dX_{i}'] = None
             self.tactile_0[f'0_dY_{i}'] = None
             self.tactile_0[f'0_dZ_{i}'] = None

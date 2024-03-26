@@ -1,5 +1,5 @@
 # Request
-int64 location_goal
+string move_direction
 ---
 # Response
 bool success

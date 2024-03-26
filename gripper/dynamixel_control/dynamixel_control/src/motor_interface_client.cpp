@@ -1,7 +1,7 @@
 #include "motor_interface_client.hpp"
 
 
-MotorInterfaceClient::MotorInterfaceClient(uint8_t operating_mode, uint32_t goal_current, uint32_t goal_position)
+MotorInterfaceClient::MotorInterfaceClient(uint8_t operating_mode, double goal_current, uint32_t goal_position)
     : Node("motor_client"),
       operating_mode_(operating_mode),
       goal_current_(goal_current),
@@ -31,8 +31,8 @@ MotorInterfaceClient::MotorInterfaceClient(uint8_t operating_mode, uint32_t goal
     uint32_t lower_pos_bound = 1290;
 
     // Set current bounds
-    uint32_t upper_current_bound = 10;
-    uint32_t lower_current_bound = 3;
+    double upper_current_bound = 10.0;
+    double lower_current_bound = 3.0;
 
     // Set current-based position bounds
     uint32_t upper_pos_bound_cb = 103390;
@@ -53,12 +53,12 @@ MotorInterfaceClient::MotorInterfaceClient(uint8_t operating_mode, uint32_t goal
     // Check bounds on current
     if (goal_current_ > upper_current_bound)
     {
-        RCLCPP_WARN(this->get_logger(), "Current upper bound exceeded - capping value. [Goal Current: %d]", upper_current_bound);
+        RCLCPP_WARN(this->get_logger(), "Current upper bound exceeded - capping value. [Goal Current: %f]", upper_current_bound);
         goal_current_ = upper_current_bound;
     }
     else if (goal_current_ < lower_current_bound)
     {
-        RCLCPP_WARN(this->get_logger(), "Current lower bound exceeded - capping value. [Goal Current: %d]", lower_current_bound);
+        RCLCPP_WARN(this->get_logger(), "Current lower bound exceeded - capping value. [Goal Current: %f]", lower_current_bound);
         goal_current_ = lower_current_bound;
     }
 
@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
         return 1;
     }
     uint8_t operating_mode = std::stoi(argv[1]);
-    uint32_t goal_current = std::stoi(argv[2]);
+    double goal_current = std::stoi(argv[2]);
     uint32_t goal_position = std::stoi(argv[3]);
 
     // Create a shared pointer to manage the lifetime of the node object
