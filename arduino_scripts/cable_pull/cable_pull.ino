@@ -25,6 +25,8 @@ void setup() {
   
   // Initialize serial communication
   Serial.begin(115200);
+
+  Serial.println(command);
 }
 
 void loop() {
@@ -39,6 +41,7 @@ void loop() {
     } else {
       // Button is released, send status to serial
       Serial.println("SEATED");
+      stepper.stop(); // Stop the motor
     }
     delay(50); // Debounce delay
   }
@@ -48,13 +51,15 @@ void loop() {
   // Check for serial commands
   if (Serial.available() > 0) {
     command = Serial.readStringUntil('\n');
-    Serial.println(command);
     if (command == "PULL") {
       // Move motor in one direction
-      stepper.moveTo(1500); // Adjust the steps according to your requirement
-    } else if (command == "HOME") {
+      stepper.moveTo(1500);
+//      stepper.run();
+    }
+    if (command == "HOME") {
       // Move motor in the other direction
-      stepper.moveTo(-1500); // Adjust the steps according to your requirement
+      stepper.moveTo(-1500);
+//      stepper.run();
     }
   }
 

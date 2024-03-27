@@ -1,7 +1,6 @@
 import rclpy
 from rclpy.node import Node
 from trial_control_msgs.srv import LinearActuator, CableState
-# from trial_control_msgs.msg import CableState
 import serial
 
 from rclpy.executors import MultiThreadedExecutor
@@ -22,10 +21,7 @@ class LinearActuatorControl(Node):
         # Open the serial connection to Arduino
         self.arduino = serial.Serial(self.arduino_port, self.baudrate, timeout=1)
 
-        # # Create a publisher for button state
-        # self.cable_state_pub = self.create_publisher(CableState, 'cable_state', 1)
-
-        # self.run()
+        self.cable_state = None
 
     def linear_actuator_callback(self, request, response):
         self.get_logger().info('Received movement request')
@@ -43,26 +39,17 @@ class LinearActuatorControl(Node):
         return response
     
     def cable_state_callback(self, request, response):
-        if self.arduino.in_waiting > 0:
-            # Get cable seatment status
-            cable_status = self.arduino.readline().decode().split('\r')
+        # Get cable seatment status
+        cable_status = self.arduino.readline().decode().split('\r')
 
-            self.get_logger().info(f"Cable state: {cable_status[0]}")
+        if cable_status[0] != "":
+            self.cable_state = cable_status[0]
 
-            response.state = cable_status[0]
-    
-    # def run(self):
-    #     while rclpy.ok():
-    #         if self.arduino.in_waiting > 0:
-    #            # Get cable seatment status
-    #             cable_status = self.arduino.readline().decode().split('\r')
+        self.get_logger().info(f"Cable state: {self.cable_state}")
 
-    #             self.get_logger().info(f"Cable state: {cable_status[0]}")
-
-    #             # Publish cable seatment state
-    #             msg = CableState()
-    #             msg.cable_state = cable_status[0]
-    #             self.cable_state_pub.publish(msg) 
+        response.state = self.cable_state
+        
+        return response
         
 
 def main(args=None):

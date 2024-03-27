@@ -15,7 +15,6 @@ from sensor_interfaces.msg import SensorState
 from trial_control_msgs.action import RecordData
 
 
-
 class Record(Node):
     def __init__(self):
         super().__init__('record')

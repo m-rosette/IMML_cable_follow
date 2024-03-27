@@ -15,7 +15,6 @@ from trial_control_msgs.srv import LinearActuator, CableState
 from dynamixel_control_msgs.srv import SetOperatingMode
 from sensor_interfaces.srv import BiasRequest, StartSlipDetection, StopSlipDetection
 from sensor_interfaces.msg import SensorState
-# from trial_control_msgs.msg import CableState
 
 
 # Dynamixel current (torque) variables
@@ -101,7 +100,7 @@ class GripperControl(Node):
         # Initialize cable state
         self.cable_state = 'SEATED'
 
-    def save_tactile_data(self, filename):
+    def save_gripper_data(self, filename):
         # Log the status of the user input
         self.get_logger().info(f"Saving data to filename: {filename}")
 
@@ -130,7 +129,9 @@ class GripperControl(Node):
 
         request = CableState.Request()
 
-        self.cable_state = self.cable_status_client.call_async(request)
+        self.cable_state_future = self.cable_status_client.call_async(request)
+        rclpy.spin_until_future_complete(self, self.cable_state_future)
+        return self.cable_state_future.result()
 
     def send_linear_actuator_request(self, command):
         self.get_logger().info(f"Requested linear actuator position: {command}")
@@ -187,16 +188,20 @@ class GripperControl(Node):
     
     def cable_state_callback(self, msg):
         self.cable_state = msg.cable_state
-        self.get_logger().info(f'Cable callback with state: {self.cable_state}')
+        self.get_logger().info(f'Cable callback with state: {self.cable_state.state}')
 
     def run(self, filename):
-        # Send the filename to the record action (starts recording)
-        self.save_tactile_data(filename)
+        # Get the current cable state
+        self.cable_state = self.get_cable_status()
 
         # Make sure gripper is open
         self.grip_current = OPERATING_CURRENT
         self.get_logger().info("Opening gripper")
         self.send_motor_request(CURRENT_BASED_POSITION_MODE, self.grip_current, FULLY_OPEN_POS_CB)
+        time.sleep(0.25)
+
+        # Send the filename to the record action (starts recording)
+        self.save_gripper_data(filename)
 
         time.sleep(2.5)
 
@@ -206,41 +211,39 @@ class GripperControl(Node):
 
         # Start slip detection controller - Only once tactile sensors have initial contact
         self.get_logger().info("Starting slip detection")
-        # request = Empty.Request()
         request = StartSlipDetection.Request()
         self.tactile_start_slip_client.call_async(request)
 
         # Start cable pull 
         self.get_logger().info("Beginning cable pull")
-        
-        # Move linear actuator forward
         self.send_linear_actuator_request('PULL')
-        # self.get_logger().info(f'Cable state: {self.cable_state}')
-        time.sleep(1.5)
 
-        while self.cable_state == 'SEATED':
-            self.get_cable_status()
-            
-            self.get_logger().info(f'Cable state: {self.cable_state}')
+        while self.cable_state.state == 'SEATED':
+            self.cable_state = self.get_cable_status()
+            self.get_logger().info(f'Cable state: {self.cable_state.state}')
+
             # If slip is detected, increase grip current
             if any(slip_num == 3 for slip_num in self.tactile_0_slipstate) or any(slip_num == 3 for slip_num in self.tactile_1_slipstate):
-                grip_current += 0.1
-                self.get_logger().info(f"Slip detected [New Current Goal: {grip_current}]")
-                self.send_motor_request(CURRENT_BASED_POSITION_MODE, grip_current, FULLY_CLOSED_POS_CB) 
+                self.grip_current += 0.1
+                self.get_logger().info(f"Slip detected [New Current Goal: {self.grip_current}]")
+                self.send_motor_request(CURRENT_BASED_POSITION_MODE, self.grip_current, FULLY_CLOSED_POS_CB) 
                 # time.sleep(0.5)
         
         self.get_logger().info("Cable unseated")
 
         # Stop slip detection controller
         self.get_logger().info("Stoping slip detection")
-        # request = Empty.Request()
         request = StopSlipDetection.Request()
         self.tactile_stop_slip_client.call_async(request)
 
         self.get_logger().info("Returning home")
-        # while self.cable_state == 'UNSEATED':
-        #     # Move linear actuator home
         self.send_linear_actuator_request('HOME')
+
+        while self.cable_state.state == 'UNSEATED':
+            self.cable_state = self.get_cable_status()
+            self.get_logger().info(f'Cable state: {self.cable_state.state}')
+
+        self.get_logger().info("Cable reseated")
         
         # Open the gripper once home
         self.get_logger().info("Opening gripper")
@@ -254,10 +257,7 @@ def main(args=None):
     # Make a node class
     gripper_control = GripperControl()
 
-    # # Use a MultiThreadedExecutor to enable processing goals concurrently
-    # executor = MultiThreadedExecutor()
-
-    # get user input filename
+    # Get user input filename
     try:
         filename = str(sys.argv[1])
     except:
@@ -270,7 +270,6 @@ def main(args=None):
     gripper_control.run(filename)    
 
     rclpy.spin(gripper_control)
-    # rclpy.spin(gripper_control, executor=executor)
 
     # Shutdown everything cleanly
     rclpy.shutdown()

@@ -46,6 +46,7 @@ ReadWriteNode::ReadWriteNode()
 
   // Initialize the present position publisher
   present_position_publisher_ = this->create_publisher<std_msgs::msg::Int64>("present_position", 10);
+  present_position_timer_ = this->create_wall_timer(500ms, std::bind(&ReadWriteNode::publishPresentPosition, this));
 
   set_position_subscriber_ =
     this->create_subscription<SetPosition>(
@@ -228,10 +229,10 @@ void ReadWriteNode::publishPresentPosition()
   // Read Present Position (length : 4 bytes) and Convert uint32 -> int32
   // When reading 2 byte data from AX / MX(1.0), use read2ByteTxRx() instead.
   uint8_t dxl_error = 0;
-  uint8_t dxl_id = BROADCAST_ID;
+  // uint8_t dxl_id = BROADCAST_ID;
   dxl_comm_result = packetHandler->read4ByteTxRx(
     portHandler,
-    dxl_id,
+    1,
     ADDR_PRESENT_POSITION,
     reinterpret_cast<uint32_t *>(&present_position),
     &dxl_error
@@ -244,14 +245,14 @@ void ReadWriteNode::publishPresentPosition()
     RCLCPP_INFO(
       this->get_logger(),
       "Published [ID: %d] [Present Position: %d]",
-      dxl_id,
+      1,
       present_position
     );
   } else {
     RCLCPP_ERROR(
       this->get_logger(),
       "Failed to read present position for ID: %d. Error: %s",
-      dxl_id,
+      1,
       packetHandler->getTxRxResult(dxl_comm_result)
     );
   }
