@@ -30,6 +30,7 @@
 
 /* Constants related to Controller sampling rate */
 
+#define SAMP_RATE_25        25      // Constant representing 25 Hz sampling rate
 #define SAMP_RATE_100		100		// Constant representing 100 Hz sampling rate
 #define SAMP_RATE_250		250		// Constant representing 250 Hz sampling rate
 #define SAMP_RATE_500		500		// Constant representing 500 Hz sampling rate

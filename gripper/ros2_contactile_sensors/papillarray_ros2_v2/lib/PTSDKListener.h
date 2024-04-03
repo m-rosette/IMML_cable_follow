@@ -32,7 +32,7 @@
 #include <cstdint>
 #include <stdint.h>
 #include <pthread.h>
-#define BYTE byte
+#define BYTE std::byte
 #define DWORD uint32_t
 #define HANDLE int
 #endif
@@ -44,7 +44,7 @@
 #define LOG_FILENAME_LEN		100
 #define BIGARRAY_LEN			100000		// 
 
-// using namespace std;
+using namespace std;
 
 #ifdef _WIN32
 void PTSDK_CPP_LIB_API PTSDKListener_event_thread_start(void* arg);

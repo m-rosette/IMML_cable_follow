@@ -35,8 +35,10 @@ MotorInterfaceClient::MotorInterfaceClient(uint8_t operating_mode, double goal_c
     double lower_current_bound = 3.0;
 
     // Set current-based position bounds
-    uint32_t upper_pos_bound_cb = 103390;
-    uint32_t lower_pos_bound_cb = 101280;
+    // uint32_t upper_pos_bound_cb = 103390;
+    // uint32_t lower_pos_bound_cb = 101280;
+    uint32_t upper_pos_bound_cb = 4725;
+    uint32_t lower_pos_bound_cb = 3250;
 
     // Check bounds on position
     if (operating_mode_ == 3 && goal_position_ > upper_pos_bound)

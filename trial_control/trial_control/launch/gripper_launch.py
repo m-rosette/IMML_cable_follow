@@ -41,11 +41,11 @@ def generate_launch_description():
             name='linear_actuator',
         ),
 
-        # # Start the dual dynamixel motor client
-        # Node(
-        #     package='dynamixel_control',
-        #     executable='dual_motor_client',
-        #     name='dual_motor_client',
-        # ),
+        # Start the slip check node
+        Node(
+            package='trial_control',
+            executable='slip_check',
+            name='slip_check',
+        ),
 
 ])

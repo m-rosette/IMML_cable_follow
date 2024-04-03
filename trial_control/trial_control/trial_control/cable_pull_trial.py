@@ -7,11 +7,12 @@ from rclpy.executors import MultiThreadedExecutor
 import sys
 import os
 import time
+import threading
 
 from std_msgs.msg import String, Float64
 from std_srvs.srv import Empty
 from trial_control_msgs.action import RecordData
-from trial_control_msgs.srv import LinearActuator, CableState
+from trial_control_msgs.srv import LinearActuator, CableState, TactileSlip
 from dynamixel_control_msgs.srv import SetOperatingMode
 from sensor_interfaces.srv import BiasRequest, StartSlipDetection, StopSlipDetection
 from sensor_interfaces.msg import SensorState
@@ -21,7 +22,7 @@ from sensor_interfaces.msg import SensorState
 CURRENT_MODE = 0
 UPPER_CURRENT_BOUND = 10.0
 LOWER_CURRENT_BOUND = 1.0
-OPERATING_CURRENT = 4.0
+OPERATING_CURRENT = 20.0
 
 # Dynamixel position variables
 POSITION_MODE = 3
@@ -32,10 +33,18 @@ FULLY_CLOSED_POS = 1290
 
 # Dynamixel current based position variables
 CURRENT_BASED_POSITION_MODE = 5
-UPPER_POS_BOUND_CB = 103390
-LOWER_POS_BOUND_CB = 101290
-FULLY_OPEN_POS_CB = 101290
-FULLY_CLOSED_POS_CB = 103390
+
+# # Gripper V1
+# UPPER_POS_BOUND_CB = 103390
+# LOWER_POS_BOUND_CB = 101290
+# FULLY_OPEN_POS_CB = 101290
+# FULLY_CLOSED_POS_CB = 103390
+
+# Gripper V2
+UPPER_POS_BOUND_CB = 4725
+LOWER_POS_BOUND_CB = 3250
+FULLY_OPEN_POS_CB = 3250
+FULLY_CLOSED_POS_CB = 4725
 
 class GripperControl(Node):
     def __init__(self):
@@ -44,18 +53,25 @@ class GripperControl(Node):
 
         self.get_logger().info("Gripper Control node started")
 
-        # Create record action client
-        self.record_client = ActionClient(self, RecordData, 'record_server')
+        # Initialize gripper variables
+        self.grip_current = OPERATING_CURRENT
+        self.cable_state = 'SEATED'
+        self.tactile_0_slipstate = []
+        self.tactile_1_slipstate = []         
+        # self.mutex = threading.Lock()
 
-        # Wait until the server is ready to accept an action request
+        # Create record action client and wait for it to start
+        self.record_client = ActionClient(self, RecordData, 'record_server')
         self.record_client.wait_for_server()
 
         # Create publisher for operating current values
         self.motor_current_pub = self.create_publisher(Float64, 'motor_current', 1)
         self.motor_current_timer = self.create_timer(0.1, self.motor_current_callback)
 
-        # # Create cable state subscription
-        # self.cable_state_sub = self.create_subscription(CableState, 'cable_state', self.cable_state_callback, 10)
+        # Create cable status service client
+        self.slip_status_client = self.create_client(TactileSlip, 'tactile_slip')
+        while not self.slip_status_client.wait_for_service(timeout_sec=1):
+            self.get_logger().info('waiting for tactile_slip service to start')
 
         # Create cable status service client
         self.cable_status_client = self.create_client(CableState, 'cable_state')
@@ -73,10 +89,9 @@ class GripperControl(Node):
             self.get_logger().info('waiting for linear_actuator service to start')
 
         # Create tactile sensor service client to send bias request (zero initial readings)
-        self.tactile_client = self.create_client(BiasRequest, '/hub_0/send_bias_request')
-        while not self.tactile_client.wait_for_service(timeout_sec=1):
+        self.bias_tactile_client = self.create_client(BiasRequest, '/hub_0/send_bias_request')
+        while not self.bias_tactile_client.wait_for_service(timeout_sec=1):
             self.get_logger().info('waiting for tactile service to start')
-        self.get_logger().info('Biasing tactile sensors')
 
         # Create tactile sensor service client for starting and stoping slip detection
         self.tactile_start_slip_client = self.create_client(StartSlipDetection, '/hub_0/start_slip_detection')
@@ -89,17 +104,6 @@ class GripperControl(Node):
             
         self.get_logger().info('Tactile slip services started')
 
-        # Subscribe to tactile sensor feedback
-        self.tactile_0_sub = self.create_subscription(SensorState, 'hub_0/sensor_0', self.tactile_0_callback, 10)
-        self.tactile_1_sub = self.create_subscription(SensorState, 'hub_0/sensor_1', self.tactile_1_callback, 10)
-        self.tactile_0_slipstate = {}
-        self.tactile_1_slipstate = {}
-
-        self.grip_current = 0
-    
-        # Initialize cable state
-        self.cable_state = 'SEATED'
-
     def save_gripper_data(self, filename):
         # Log the status of the user input
         self.get_logger().info(f"Saving data to filename: {filename}")
@@ -110,14 +114,39 @@ class GripperControl(Node):
 
         # Send goal
         self.record_client.send_goal_async(goal)
-    
-    def tactile_0_callback(self, tac_msg):
-        for i in range(9):
-            self.tactile_0_slipstate[f'0_slipstate_{i}'] = tac_msg.pillars[i].slip_state
 
-    def tactile_1_callback(self, tac_msg):
-        for i in range(9):
-            self.tactile_1_slipstate[f'1_slipstate_{i}'] = tac_msg.pillars[i].slip_state
+    def bias_tactile(self):
+        self.get_logger().info('Biasing tactile sensors')
+
+        request = BiasRequest.Request()
+        self.bias_tactile_client.call_async(request)
+    
+    def start_slip_detection(self):
+        self.get_logger().info("Requesting to start slip detection")
+
+        request = StartSlipDetection.Request()
+
+        self.start_slip_detection_response = self.tactile_start_slip_client.call_async(request)
+        rclpy.spin_until_future_complete(self, self.start_slip_detection_response)
+        return self.start_slip_detection_response.result()
+    
+    def stop_slip_detection(self):
+        self.get_logger().info("Requesting to stop slip detection")
+
+        request = StopSlipDetection.Request()
+
+        self.stop_slip_detection_response = self.tactile_stop_slip_client.call_async(request)
+        rclpy.spin_until_future_complete(self, self.stop_slip_detection_response)
+        return self.stop_slip_detection_response.result()
+    
+    def get_slip_status(self):
+        self.get_logger().info("Requesting tactile slip status")
+
+        request = TactileSlip.Request()
+
+        self.slip_status_future = self.slip_status_client.call_async(request)
+        rclpy.spin_until_future_complete(self, self.slip_status_future)
+        return self.slip_status_future.result()
 
     def motor_current_callback(self):
         msg = Float64()
@@ -185,10 +214,6 @@ class GripperControl(Node):
             goal_position = LOWER_POS_BOUND_CB
 
         return goal_current, goal_position
-    
-    def cable_state_callback(self, msg):
-        self.cable_state = msg.cable_state
-        self.get_logger().info(f'Cable callback with state: {self.cable_state.state}')
 
     def run(self, filename):
         # Get the current cable state
@@ -196,9 +221,14 @@ class GripperControl(Node):
 
         # Make sure gripper is open
         self.grip_current = OPERATING_CURRENT
+        # self.grip_current = 5.0
         self.get_logger().info("Opening gripper")
-        self.send_motor_request(CURRENT_BASED_POSITION_MODE, self.grip_current, FULLY_OPEN_POS_CB)
+        self.send_motor_request(CURRENT_BASED_POSITION_MODE, OPERATING_CURRENT, FULLY_OPEN_POS_CB)
         time.sleep(0.25)
+
+        # Bias the tactile data
+        self.bias_tactile()
+        # time.sleep(0.25)
 
         # Send the filename to the record action (starts recording)
         self.save_gripper_data(filename)
@@ -209,10 +239,12 @@ class GripperControl(Node):
         self.get_logger().info("Closing gripper")
         self.send_motor_request(CURRENT_BASED_POSITION_MODE, self.grip_current, FULLY_CLOSED_POS_CB)  
 
+        time.sleep(2)
+
         # Start slip detection controller - Only once tactile sensors have initial contact
         self.get_logger().info("Starting slip detection")
-        request = StartSlipDetection.Request()
-        self.tactile_start_slip_client.call_async(request)
+        self.start_detection = self.start_slip_detection()
+        self.get_logger().info(f'Detection state: {self.start_detection.result}')
 
         # Start cable pull 
         self.get_logger().info("Beginning cable pull")
@@ -220,21 +252,24 @@ class GripperControl(Node):
 
         while self.cable_state.state == 'SEATED':
             self.cable_state = self.get_cable_status()
-            self.get_logger().info(f'Cable state: {self.cable_state.state}')
+
+            self.slip_state = self.get_slip_status()
+            self.tactile_0_slipstate = self.slip_state.tactile0_slip
+            self.tactile_1_slipstate = self.slip_state.tactile1_slip
 
             # If slip is detected, increase grip current
             if any(slip_num == 3 for slip_num in self.tactile_0_slipstate) or any(slip_num == 3 for slip_num in self.tactile_1_slipstate):
-                self.grip_current += 0.1
+                self.grip_current += 1
                 self.get_logger().info(f"Slip detected [New Current Goal: {self.grip_current}]")
                 self.send_motor_request(CURRENT_BASED_POSITION_MODE, self.grip_current, FULLY_CLOSED_POS_CB) 
-                # time.sleep(0.5)
         
         self.get_logger().info("Cable unseated")
+        time.sleep(1)
 
         # Stop slip detection controller
         self.get_logger().info("Stoping slip detection")
-        request = StopSlipDetection.Request()
-        self.tactile_stop_slip_client.call_async(request)
+        self.stop_detection = self.stop_slip_detection()
+        self.get_logger().info(f'Detection state: {self.stop_detection.result}')
 
         self.get_logger().info("Returning home")
         self.send_linear_actuator_request('HOME')

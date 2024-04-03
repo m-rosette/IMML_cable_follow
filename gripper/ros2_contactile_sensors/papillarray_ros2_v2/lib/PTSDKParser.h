@@ -25,7 +25,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <stdint.h>
-#define BYTE byte
+#define BYTE std::byte
 #define DWORD uint32_t
 #endif
 
@@ -44,7 +44,7 @@
 #define MAX_DATAPACKETLEN	2048		// Maximum number of bytes in the data packet (the actual number of bytes may be variable)
 #define BIGARRAY_LEN		100000		// 
 
-// using namespace std;
+using namespace std;
 
 /** \brief The PTSDKParser class describes a parser for the data packet transmitted from a Controller with a number of PapillArray Tactile Sensors connected.
  *

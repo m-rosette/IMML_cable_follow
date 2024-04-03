@@ -22,6 +22,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/LinearActuator.srv"
   "msg/CableState.msg"
   "srv/CableState.srv"
+  "srv/TactileSlip.srv"
 )
 
 ament_export_dependencies(rosidl_default_runtime)

@@ -17,7 +17,7 @@ String command = "SEATED";
 
 void setup() {
   // Set up stepper motor
-  stepper.setMaxSpeed(200); // Set your desired maximum speed
+  stepper.setMaxSpeed(100); // Set your desired maximum speed
   stepper.setAcceleration(500); // Set your desired acceleration
   
   // Set up button pin
@@ -37,13 +37,14 @@ void loop() {
     if (reading == LOW) {
       // Button is pressed, send status to serial
       Serial.println("UNSEATED");
+      delay(200);
       stepper.stop(); // Stop the motor
     } else {
       // Button is released, send status to serial
       Serial.println("SEATED");
       stepper.stop(); // Stop the motor
     }
-    delay(50); // Debounce delay
+    delay(100); // Debounce delay
   }
   
   lastButtonState = reading;
@@ -54,12 +55,10 @@ void loop() {
     if (command == "PULL") {
       // Move motor in one direction
       stepper.moveTo(1500);
-//      stepper.run();
     }
     if (command == "HOME") {
       // Move motor in the other direction
       stepper.moveTo(-1500);
-//      stepper.run();
     }
   }
 

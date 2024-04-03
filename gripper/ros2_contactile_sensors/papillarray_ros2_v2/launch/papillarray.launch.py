@@ -41,7 +41,7 @@ def generate_launch_description():
     )
     sampling_rate_arg = DeclareLaunchArgument(
         'sampling_rate',
-        default_value='500',
+        default_value='25',
         description='Rate (Hz): 100, 250, 500, or 1000'
     )
 
