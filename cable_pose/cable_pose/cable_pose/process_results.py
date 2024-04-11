@@ -1,17 +1,15 @@
 import numpy as np
-import math
-# import cv2
-from dataset_info import get_dataset_info, image_to_gripper_transform, gripper_to_image_transform
 import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
-from tensorflow.keras import layers
-import numpy as np
 import math
 import pandas as pd
 import pickle
-from sklearn.preprocessing import MinMaxScaler
 import cv2
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras import layers
+from sklearn.preprocessing import MinMaxScaler
+
+from dataset_info import get_dataset_info, image_to_gripper_transform, gripper_to_image_transform
 
 
 class ResultsProcessor:

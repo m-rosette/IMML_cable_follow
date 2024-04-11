@@ -1,7 +1,9 @@
 import keras.models
 import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
+# from tensorflow.keras.models import Sequential
+from keras.models import Sequential
+# from tensorflow.keras.layers import LSTM, Dense, Dropout
+from keras.layers import LSTM, Dense, Dropout
 from keras.callbacks import ModelCheckpoint
 
 import numpy as np
@@ -24,12 +26,13 @@ class CustomEvaluationCallback(tf.keras.callbacks.Callback):
     def __init__(self, evaluation_data, dataset_info, model, data_save_directory=None, trial_num=None):
         super(CustomEvaluationCallback, self).__init__()
         self.dataset_info = dataset_info
-        self.model = model
+        # self.model = model
         self.data_save_directory = data_save_directory
         self.trial_num = trial_num
         self.X_val = evaluation_data[0]
         self.y_val = evaluation_data[1]
-        self.results_processor = ResultsProcessor(model)
+        # self.results_processor = ResultsProcessor(model)
+        self.results_processor = None
         self.stats = {"average_distance_error": [],
                         "average_angle_error": [],
                         "median_distance_error": [],
@@ -38,6 +41,9 @@ class CustomEvaluationCallback(tf.keras.callbacks.Callback):
 
 
     def on_epoch_end(self, epoch, logs=None):
+        model = self.model  # Get the model from the callback
+        if self.results_processor is None:
+            self.results_processor = ResultsProcessor(model)
         stats = test_model(model=self.model, dataset_info=self.dataset_info, results_processor=self.results_processor)
         self.stats["average_distance_error"].append(stats["average_distance_error"])
         self.stats["average_angle_error"].append(stats["average_angle_error"])
@@ -91,7 +97,7 @@ evaluate_with_metric (bool): If True, the evaluation metric will be run each epo
     model = Sequential()
 
     # First LSTM layer
-    model.add(LSTM(dataset_info["num_units"],
+    model.add(LSTM(units=dataset_info["num_units"],
                    activation=dataset_info["activation_function"],
                    input_shape=(dataset_info["time_steps_to_use"], dataset_info["num_features"]),
                    # return_sequences=False,
@@ -100,7 +106,10 @@ evaluate_with_metric (bool): If True, the evaluation metric will be run each epo
 
     model.add(Dense(3))
 
-    model.compile(optimizer=dataset_info["optimizer"], loss=dataset_info["loss_function"])
+    optimizer = keras.optimizers.Adam()
+    loss_func = keras.losses.MeanAbsoluteError()
+    model.compile(optimizer=optimizer, loss=loss_func)
+    # model.compile(optimizer=dataset_info["optimizer"], loss=dataset_info["loss_function"])
 
     if evaluate_with_metric:
         custom_evaluation_callback = CustomEvaluationCallback(evaluation_data=(X_val, y_val), dataset_info=dataset_info,
@@ -285,9 +294,9 @@ def run_trial(note=None):
         image_directory = os.path.join(trial_directory, "images_{}".format(i))
         os.mkdir(image_directory)
         model_path = os.path.join(trial_directory, "model_{}.h5".format(i))
-        model, plt, train_loss, val_loss = train_model(dataset_info=dataset_info,
-                                                       data_save_directory=trial_directory,
-                                                       trial_num=i)
+        model = train_model(dataset_info=dataset_info,
+                            data_save_directory=trial_directory,
+                            trial_num=i)
         model.save(model_path)
 
         # test the model
@@ -372,10 +381,10 @@ if __name__ == "__main__":
     # dataset_info = get_dataset_info()
     # model = keras.models.load_model(dataset_info["model_path"])
 
-    # note = "testing multiplier effect on mae2"
-    # run_trial(note)
+    note = "first test"
+    run_trial(note)
 
-    model = train_model(dataset_info=get_dataset_info(), data_save_directory="/home/jostan/Documents/trials1", evaluate_with_metric=True)
+    # model = train_model(dataset_info=get_dataset_info(), data_save_directory="/home/jostan/Documents/trials1", evaluate_with_metric=True)
 
 
     # image_save_directory = "/home/jostan/Documents/trials1/images"

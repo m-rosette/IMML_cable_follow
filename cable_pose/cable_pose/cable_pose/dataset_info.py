@@ -21,29 +21,30 @@ def get_dataset_info():
 
     if gloved:
        dataset_directory = '/home/marcus/IMML/ros2_ws/data/gloved/'
+       skip_trials = []
     else:
         dataset_directory = '/home/marcus/IMML/ros2_ws/data/gloveless/'
+        # Trials numbers to not use for training, mostly because they don't have valid entry/exit points
+        skip_trials = [52, 53, 54, 55, 56, 57, 58, 59, 61, 67, 68, 69, 78]
+        # 52-61 catches a shadow at the bottom of gripper (can you crop that?)
+        # maybe 60, 65, 72 (1 outlier)
 
     package_directory = '/home/marcus/IMML/ros2_ws/src/IMML_cable_follow/cable_pose/'
 
     dataset_info["operation_data_path"] = os.path.join(dataset_directory, "data", "0_0.csv")
     dataset_info["operation_image_path"] = os.path.join(dataset_directory, "images", "0_0.jpg") 
 
-    # dataset_info["model_path"] = os.path.join(package_directory, "model_data", "model_5_2.h5")
-    # dataset_info["scaler_path"] = os.path.join(package_directory, "model_data", "scaler.pkl")
+    dataset_info["model_path"] = os.path.join(package_directory, "model_data", "model_5_2.h5")
+    dataset_info["scaler_path"] = os.path.join(package_directory, "model_data", "scaler.pkl")
     dataset_info["move_distance"] = 10  # mm
     dataset_info["min_radius"] = 40  # mm
 
-    # Trials numbers to not use for training, mostly because they don't have valid entry/exit points
-    # skip_trials = [32, 34, 30, 38, 39]
-    skip_trials = []
-
     dataset_info["enter_exit_multiplier"] = 10
-    dataset_info["time_steps_to_use"] = 30
+    dataset_info["time_steps_to_use"] = 50
     dataset_info["num_epochs"] = 200
     dataset_info["batch_size"] = 10
     dataset_info["model_version"] = 1
-    dataset_info["num_testing_trials"] = 6
+    dataset_info["num_testing_trials"] = 1
     dataset_info["activation_function"] = "relu"
     dataset_info["loss_function"] = "mean_absolute_error"
     dataset_info["optimizer"] = "adam"
@@ -94,7 +95,7 @@ def get_dataset_info():
     dataset_info["trials_directory"] = os.path.join(dataset_directory, "trials")
 
     dataset_info["ground_truth_data_path"] = os.path.join(dataset_directory, 'processed_data', "ground_truth_data.npy")
-    dataset_info["X_train_path"] = os.path.join(dataset_directory, 'processed_data_', "X_train.npy")
+    dataset_info["X_train_path"] = os.path.join(dataset_directory, 'processed_data', "X_train.npy")
     dataset_info["y_train_path"] = os.path.join(dataset_directory, 'processed_data', "y_train.npy")
     dataset_info["X_val_path"] = os.path.join(dataset_directory, 'processed_data', "X_val.npy")
     dataset_info["y_val_path"] = os.path.join(dataset_directory, 'processed_data', "y_val.npy")

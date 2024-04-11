@@ -488,6 +488,7 @@ def setup_train_and_val_data():
     np.save(dataset_info["val_data_file_names_path"], file_names_val)
     np.save(dataset_info["train_data_file_names_path"], file_names_train)
 
+
 if __name__ == "__main__":
-    get_ground_truth_data()
-    # setup_train_and_val_data()
+    # get_ground_truth_data()
+    setup_train_and_val_data()
