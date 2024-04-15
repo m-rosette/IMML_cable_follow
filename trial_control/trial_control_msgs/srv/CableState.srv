@@ -2,4 +2,5 @@
 
 ---
 # Response
-string state
+# string state
+int16 state

@@ -10,7 +10,7 @@ import threading
 
 import time
 
-from std_msgs.msg import Int64, Float64
+from std_msgs.msg import Int16, Int64, Float64
 from sensor_interfaces.msg import SensorState
 from trial_control_msgs.action import RecordData
 
@@ -27,9 +27,10 @@ class Record(Node):
         # Initialize dictionaries to store data from subscribers
         self.initialize_tactile_dict()
 
-        # Subscribe to gripper position and current 
+        # Subscribe to gripper position and current and cable seatment status
         self.gripper_pos_sub = self.create_subscription(Int64, 'present_position', self.gripper_pos_callback, 10)
         self.gripper_current_sub = self.create_subscription(Float64, 'motor_current', self.gripper_current_callback, 10)
+        self.cable_status_sub = self.create_subscription(Int16, 'cable_status', self.cable_status_callback, 10)
 
         # Subscribe to tactile sensor feedback
         self.tactile_0_sub = self.create_subscription(SensorState, 'hub_0/sensor_0', self.tactile_0_callback, 10)
@@ -41,15 +42,21 @@ class Record(Node):
 
     def action_callback(self, goal_handle):
         self.filename = goal_handle.request.filename
-        self.get_logger().info(f"Recording starting. Saving to {self.filename}")
+        file_path = os.path.join(self.storage_directory, f"{self.filename}.csv")        
 
-        file_path = os.path.join(self.storage_directory, f"{self.filename}.csv")
+        # Handle if no filename is given
+        if self.filename == '':
+            self.get_logger().error("Error: No filename provided. Terminating recording...")
+            goal_handle.abort()
+            return RecordData.Result(result=False)
 
         # Check if the file already exists
         if os.path.exists(file_path):
             self.get_logger().error(f"Error: File '{self.filename}' already exists in the directory. Terminating recording...")
             goal_handle.abort()
             return RecordData.Result(result=False)
+        
+        self.get_logger().info(f"Recording starting. Saving to {self.filename}")    
 
         with open(self.storage_directory + str(self.filename) + '.csv', 'w') as csvfile:
             # Write the header
@@ -57,6 +64,8 @@ class Record(Node):
             w.writeheader()
 
             while rclpy.ok() and goal_handle.is_active:
+                self.current_time['timestamp'] = time.time() 
+
                 # Combine all of the data into one dictionary
                 combined_dict = self.combine_dicts()
                 w.writerow(combined_dict)
@@ -83,6 +92,8 @@ class Record(Node):
         """
         combined_dict = OrderedDict()
         self.mutex.acquire()
+        combined_dict.update(self.current_time)
+        combined_dict.update(self.cable_status)
         combined_dict.update(self.gripper_position)
         combined_dict.update(self.gripper_current)
         combined_dict.update(self.tactile_0)
@@ -103,6 +114,12 @@ class Record(Node):
             self.tactile_0[f'0_incontact_{i}'] = tac_msg.pillars[i].in_contact
             self.tactile_0[f'0_slipstate_{i}'] = tac_msg.pillars[i].slip_state
 
+        self.tactile_0['0_gfx'] = tac_msg.gfx
+        self.tactile_0['0_gfy'] = tac_msg.gfy
+        self.tactile_0['0_gfz'] = tac_msg.gfz
+        self.tactile_0['0_gtx'] = tac_msg.gtx
+        self.tactile_0['0_gty'] = tac_msg.gty
+        self.tactile_0['0_gtz'] = tac_msg.gtz
         self.tactile_0['0_friction_est'] = tac_msg.friction_est
         self.tactile_0['0_target_grip_force'] = tac_msg.target_grip_force
         self.tactile_0['0_is_sd_active'] = tac_msg.is_sd_active
@@ -123,6 +140,12 @@ class Record(Node):
             self.tactile_1[f'1_incontact_{i}'] = tac_msg.pillars[i].in_contact
             self.tactile_1[f'1_slipstate_{i}'] = tac_msg.pillars[i].slip_state
 
+        self.tactile_1['1_gfx'] = tac_msg.gfx
+        self.tactile_1['1_gfy'] = tac_msg.gfy
+        self.tactile_1['1_gfz'] = tac_msg.gfz
+        self.tactile_1['1_gtx'] = tac_msg.gtx
+        self.tactile_1['1_gty'] = tac_msg.gty
+        self.tactile_1['1_gtz'] = tac_msg.gtz
         self.tactile_1['1_friction_est'] = tac_msg.friction_est
         self.tactile_1['1_target_grip_force'] = tac_msg.target_grip_force
         self.tactile_1['1_is_sd_active'] = tac_msg.is_sd_active
@@ -138,10 +161,16 @@ class Record(Node):
         # Saves the subscribed gripper current data to variable
         self.gripper_current['gripper_current'] = current_msg.data
 
+    def cable_status_callback(self, cable_msg):
+        # Saves the subscribed cable status data to variable
+        self.cable_status['cable_status'] = cable_msg.data
+
     def initialize_tactile_dict(self):
         """
         Initializes all of the keys in each ordered dictionary. This ensures the header and order is correct even if recording starts before data is published.
         """
+        self.current_time = OrderedDict({'timestamp': None} )
+        self.cable_status = OrderedDict({'cable_status': None})
         self.gripper_position = OrderedDict({'gripper_pos': None})
         self.gripper_current = OrderedDict({'gripper_current': None})
         self.tactile_0 = OrderedDict()
@@ -166,12 +195,24 @@ class Record(Node):
             self.tactile_1[f'1_incontact_{i}'] = None
             self.tactile_1[f'1_slipstate_{i}'] = None
 
+        self.tactile_0['0_gfx'] = None
+        self.tactile_0['0_gfy'] = None
+        self.tactile_0['0_gfz'] = None
+        self.tactile_0['0_gtx'] = None
+        self.tactile_0['0_gty'] = None
+        self.tactile_0['0_gtz'] = None
         self.tactile_0['0_friction_est'] = None
         self.tactile_0['0_target_grip_force'] = None
         self.tactile_0['0_is_sd_active'] = None
         self.tactile_0['0_is_ref_loaded'] = None
         self.tactile_0['0_is_contact'] = None
 
+        self.tactile_1['1_gfx'] = None
+        self.tactile_1['1_gfy'] = None
+        self.tactile_1['1_gfz'] = None
+        self.tactile_1['1_gtx'] = None
+        self.tactile_1['1_gty'] = None
+        self.tactile_1['1_gtz'] = None
         self.tactile_1['1_friction_est'] = None
         self.tactile_1['1_target_grip_force'] = None
         self.tactile_1['1_is_sd_active'] = None

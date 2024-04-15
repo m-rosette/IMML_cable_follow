@@ -7,34 +7,45 @@ import matplotlib.pyplot as plt
 
 
 class PlotPapillarrayForce:
-    def __init__(self) -> None:
+    def __init__(self, filename):
         self.num_arrays = 2
         self.num_pillars = 9
         self.num_dim = 3
+        self.num_global = 6
+
+        self.data = self.load_data(filename)
+        self.timestamp = np.array(self.extract_columns(header_starts_with=('timestamp')))
+        self.norm_time() # Convert from computer to trial time
+
+        self.pillar_force = np.zeros((self.num_arrays, self.num_pillars, self.data.shape[0], self.num_dim))
+        self.global_force = np.zeros((self.num_arrays, self.data.shape[0], self.num_global))
 
     def load_data(self, csv_file):
         return pd.read_csv(csv_file)
 
-    def extract_columns(self, data, header_starts_with=('0_fX', '0_fY', '0_fZ')):
+    def extract_columns(self, header_starts_with=('0_fX', '0_fY', '0_fZ')):
         # Convert all column names to strings and then filter columns
-        filtered_columns = [col for col in map(str, data.columns) if col.startswith(header_starts_with)]
+        filtered_columns = [col for col in map(str, self.data.columns) if col.startswith(header_starts_with)]
 
         # Extract the filtered columns
-        extracted_data = data[filtered_columns]
+        extracted_data = self.data[filtered_columns]
 
         return extracted_data
 
-    def norm_time(self, timestamp):
-        init_time = timestamp[0]
-        return timestamp - init_time
+    def norm_time(self):
+        init_time = self.timestamp[0]
+        self.timestamp = self.timestamp - init_time
 
-    def get_force_data(self, data):
-        pillar_force = np.zeros((self.num_arrays, self.num_pillars, data.shape[0], self.num_dim))
+    def get_force_data(self):
         for array in range(self.num_arrays):
             for pillar in range(self.num_pillars):
                 column_search = (f'{array}_fX_{pillar}', f'{array}_fY_{pillar}', f'{array}_fZ_{pillar}')
-                pillar_force[array, pillar, :, :] = self.extract_columns(data, column_search)
-        return pillar_force
+                self.pillar_force[array, pillar, :, :] = self.extract_columns(column_search)
+    
+    def get_global_force_data(self):
+        for array in range(self.num_arrays):
+            column_search = (f'{array}_gfx', f'{array}_gfy', f'{array}_gfz', f'{array}_gtx', f'{array}_gty', f'{array}_gtz')
+            self.global_force[array, :, :] = self.extract_columns(column_search)
     
     def rearrange_force(self, data):
         # 6=0, 7=1, 8=2
@@ -71,8 +82,12 @@ class PlotPapillarrayForce:
             plt.tight_layout()
             plt.show()
 
-    def plot_xyz_force(self, avg_force):
-        # Assuming 'data' contains x, y, z values for each subplot
+    def plot_xyz_force(self):
+        # self.timestamp = np.squeeze(self.timestamp)
+        force = self.get_force_data()
+        force = self.rearrange_force(force)
+
+        # Assuming 'force' contains x, y, z values for each subplot
         num_rows = 3
         num_cols = 3
         fig, axs = plt.subplots(num_rows, num_cols, figsize=(14, 12))
@@ -80,7 +95,7 @@ class PlotPapillarrayForce:
         # Flatten the axis array for easy iteration
         axs = axs.flatten()
 
-        # Define the order of subplots
+        # Define the order of subplots (according to the tactile array layout)
         subplot_order = [6, 3, 0, 7, 4, 1, 8, 5, 2]
 
         for array in range(self.num_arrays):
@@ -94,13 +109,13 @@ class PlotPapillarrayForce:
                 z_color = [255/255, 127/255, 120/255] # Dark orange
 
             for pillar, subplot_idx in enumerate(subplot_order):
-                x = avg_force[array, subplot_idx, :, 0]
-                y = avg_force[array, subplot_idx, :, 1]
-                z = avg_force[array, subplot_idx, :, 2]
+                x = force[array, subplot_idx, :, 0]
+                y = force[array, subplot_idx, :, 1]
+                z = force[array, subplot_idx, :, 2]
 
-                axs[pillar].plot(x, label=f'X_{array}', color=x_color)
-                axs[pillar].plot(y, label=f'Y_{array}', color=y_color)
-                axs[pillar].plot(z, label=f'Z_{array}', color=z_color)
+                axs[pillar].plot(self.timestamp, x, label=f'X_{array}', color=x_color)
+                axs[pillar].plot(self.timestamp, y, label=f'Y_{array}', color=y_color)
+                axs[pillar].plot(self.timestamp, z, label=f'Z_{array}', color=z_color)
 
                 axs[pillar].set_title(f'Pillar {subplot_idx}')
                 axs[pillar].legend()
@@ -112,14 +127,60 @@ class PlotPapillarrayForce:
         plt.tight_layout()
         plt.show()
 
+    def plot_cable_pull(self):
+        # self.timestamp = np.squeeze(self.timestamp)
+        self.get_global_force_data()
+
+        # Get gripper variables
+        cable_status = self.extract_columns(header_starts_with=('cable_status'))
+        grip_force = self.extract_columns(header_starts_with=('gripper_current'))
+
+        fig, ax1 = plt.subplots()
+
+        # Plot grip_force on the right y-axis
+        color = 'tab:red'
+        ax1.set_xlabel('Time')
+        ax1.set_ylabel('Grip Force', color=color)
+        print(grip_force)
+        ax1.plot(self.timestamp, grip_force, color=color, label='Grip Force')
+        ax1.tick_params(axis='y', labelcolor=color)
+
+        # Create a second y-axis for global force
+        ax2 = ax1.twinx()
+
+        # Plot global_force for array 0
+        ax2.plot(self.timestamp, self.global_force[0, :, 0], label='Array 0 - Global X', linestyle='--')
+        ax2.plot(self.timestamp, self.global_force[0, :, 1], label='Array 0 - Global Y', linestyle='--')
+        ax2.plot(self.timestamp, self.global_force[0, :, 2], label='Array 0 - Global Z', linestyle='--')
+
+        # Plot global_force for array 1
+        ax2.plot(self.timestamp, self.global_force[1, :, 0], label='Array 1 - Global X', linestyle='-.')
+        ax2.plot(self.timestamp, self.global_force[1, :, 1], label='Array 1 - Global Y', linestyle='-.')
+        ax2.plot(self.timestamp, self.global_force[1, :, 2], label='Array 1 - Global Z', linestyle='-.')
+
+        ax2.set_ylabel('Global Force', color='tab:blue')
+        ax2.tick_params(axis='y', labelcolor='tab:blue')
+
+        # Shade the region where cable_status is 'UNSEATED' (0) or 'SEATED' (1)
+        for i in range(len(cable_status)):
+            if cable_status[i] == 0:
+                ax1.axvspan(self.timestamp[i], self.timestamp[i+1], color='grey', alpha=0.3)
+                ax1.text(self.timestamp[i], ax1.get_ylim()[0], 'Unseated', verticalalignment='bottom')
+            else:
+                ax1.axvspan(self.timestamp[i], self.timestamp[i+1], color='lightgrey', alpha=0.3)
+                ax1.text(self.timestamp[i], ax1.get_ylim()[0], 'Seated', verticalalignment='bottom')
+
+        # Combine legend for both axes
+        lines, labels = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax2.legend(lines + lines2, labels + labels2, loc='upper right')
+
+        plt.show()
 
 
 if __name__ == '__main__':
-    pltforce = PlotPapillarrayForce()
-    
-    filename = '/home/marcus/IMML/ros2_ws/src/IMML_cable_follow/trial_control/trial_control/resource/test_slip2.csv'
-    data = pltforce.load_data(filename)
-    timestamp = np.array(pltforce.extract_columns(data, ('timestamp')))
-    pillar_force = pltforce.get_force_data(data)
-    pillar_force = pltforce.rearrange_force(pillar_force)
-    pltforce.plot_xyz_force(pillar_force)
+    filename = '/home/marcus/IMML/ros2_ws/src/IMML_cable_follow/trial_control/trial_control/resource/new.csv'    
+    pltforce = PlotPapillarrayForce(filename)
+
+    # pltforce.plot_xyz_force()
+    pltforce.plot_cable_pull()

@@ -28,10 +28,11 @@ class LinearActuatorControl(Node):
         try:
             # Update response
             response.success = True
+            move_dir = request.move_direction
             self.get_logger().info(f"Requesting movement to {request.move_direction}")
 
             # Send command to arduino
-            self.arduino.write(str(request.move_direction).encode())
+            self.arduino.write(move_dir.to_bytes(2, byteorder='little'))
 
         except ValueError:
             response.success = False
@@ -41,14 +42,14 @@ class LinearActuatorControl(Node):
     def cable_state_callback(self, request, response):
         # Get cable seatment status
         cable_status = self.arduino.readline().decode().split('\r')
-
+        self.get_logger().info(cable_status[0])
         if cable_status[0] != "":
-            self.cable_state = cable_status[0]
+            self.cable_state = int(cable_status[0])  # Convert to integer
 
         self.get_logger().info(f"Cable state: {self.cable_state}")
 
         response.state = self.cable_state
-        
+            
         return response
         
 

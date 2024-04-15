@@ -1,5 +1,5 @@
 # Request
-string move_direction
+int16 move_direction
 ---
 # Response
 bool success

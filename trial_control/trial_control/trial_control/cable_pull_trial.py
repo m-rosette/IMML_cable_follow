@@ -9,7 +9,7 @@ import os
 import time
 import threading
 
-from std_msgs.msg import String, Float64
+from std_msgs.msg import String, Float64, Int16
 from std_srvs.srv import Empty
 from trial_control_msgs.action import RecordData
 from trial_control_msgs.srv import LinearActuator, CableState, TactileSlip
@@ -22,7 +22,7 @@ from sensor_interfaces.msg import SensorState
 CURRENT_MODE = 0
 UPPER_CURRENT_BOUND = 10.0
 LOWER_CURRENT_BOUND = 1.0
-OPERATING_CURRENT = 20.0
+OPERATING_CURRENT = 25.0
 
 # Dynamixel position variables
 POSITION_MODE = 3
@@ -40,11 +40,15 @@ CURRENT_BASED_POSITION_MODE = 5
 # FULLY_OPEN_POS_CB = 101290
 # FULLY_CLOSED_POS_CB = 103390
 
-# Gripper V2
-UPPER_POS_BOUND_CB = 4725
-LOWER_POS_BOUND_CB = 3250
-FULLY_OPEN_POS_CB = 3250
-FULLY_CLOSED_POS_CB = 4725
+# # Gripper V2
+# UPPER_POS_BOUND_CB = 4725
+# LOWER_POS_BOUND_CB = 3250
+# FULLY_OPEN_POS_CB = 3250
+# FULLY_CLOSED_POS_CB = 4725
+UPPER_POS_BOUND_CB = 725
+LOWER_POS_BOUND_CB = -800
+FULLY_OPEN_POS_CB = -800
+FULLY_CLOSED_POS_CB = 725
 
 class GripperControl(Node):
     def __init__(self):
@@ -55,7 +59,12 @@ class GripperControl(Node):
 
         # Initialize gripper variables
         self.grip_current = OPERATING_CURRENT
-        self.cable_state = 'SEATED'
+        # self.cable_state = 'SEATED'
+        self.cable_state = 1
+        # if self.cable_state == 'SEATED':
+        #     self.cable_state_int = 1
+        # else:
+        #     self.cable_state_int = 0
         self.tactile_0_slipstate = []
         self.tactile_1_slipstate = []         
         # self.mutex = threading.Lock()
@@ -67,6 +76,10 @@ class GripperControl(Node):
         # Create publisher for operating current values
         self.motor_current_pub = self.create_publisher(Float64, 'motor_current', 1)
         self.motor_current_timer = self.create_timer(0.1, self.motor_current_callback)
+
+        # Create publisher for cable status
+        self.cable_status_pub = self.create_publisher(Int16, 'cable_status', 1)
+        self.cable_status_timer = self.create_timer(0.1, self.cable_status_pub_callback)
 
         # Create cable status service client
         self.slip_status_client = self.create_client(TactileSlip, 'tactile_slip')
@@ -153,6 +166,11 @@ class GripperControl(Node):
         msg.data = self.grip_current
         self.motor_current_pub.publish(msg)
 
+    def cable_status_pub_callback(self):       
+        msg = Int16()
+        msg.data = self.cable_state.state
+        self.cable_status_pub.publish(msg)
+
     def get_cable_status(self):
         self.get_logger().info("Requesting cable seatment status")
 
@@ -220,10 +238,10 @@ class GripperControl(Node):
         self.cable_state = self.get_cable_status()
 
         # Make sure gripper is open
-        self.grip_current = OPERATING_CURRENT
+        self.grip_current = 25.0
         # self.grip_current = 5.0
         self.get_logger().info("Opening gripper")
-        self.send_motor_request(CURRENT_BASED_POSITION_MODE, OPERATING_CURRENT, FULLY_OPEN_POS_CB)
+        self.send_motor_request(CURRENT_BASED_POSITION_MODE, 5.0, FULLY_OPEN_POS_CB)
         time.sleep(0.25)
 
         # Bias the tactile data
@@ -248,9 +266,9 @@ class GripperControl(Node):
 
         # Start cable pull 
         self.get_logger().info("Beginning cable pull")
-        self.send_linear_actuator_request('PULL')
+        self.send_linear_actuator_request(2)
 
-        while self.cable_state.state == 'SEATED':
+        while self.cable_state.state == 1:
             self.cable_state = self.get_cable_status()
 
             self.slip_state = self.get_slip_status()
@@ -272,9 +290,9 @@ class GripperControl(Node):
         self.get_logger().info(f'Detection state: {self.stop_detection.result}')
 
         self.get_logger().info("Returning home")
-        self.send_linear_actuator_request('HOME')
+        self.send_linear_actuator_request(3)
 
-        while self.cable_state.state == 'UNSEATED':
+        while self.cable_state.state == 0:
             self.cable_state = self.get_cable_status()
             self.get_logger().info(f'Cable state: {self.cable_state.state}')
 
@@ -282,7 +300,7 @@ class GripperControl(Node):
         
         # Open the gripper once home
         self.get_logger().info("Opening gripper")
-        self.send_motor_request(CURRENT_BASED_POSITION_MODE, OPERATING_CURRENT, FULLY_OPEN_POS_CB)
+        self.send_motor_request(CURRENT_BASED_POSITION_MODE, 5.0, FULLY_OPEN_POS_CB)
 
 
 def main(args=None):
@@ -296,8 +314,12 @@ def main(args=None):
     try:
         filename = str(sys.argv[1])
     except:
-        # If no filename is given or too many command line inputs 
-        if len(sys.argv) != 2:
+        # If no filename is given
+        if len(sys.argv) < 2:
+            gripper_control.get_logger().warn('No filename given. Proceeding without data collection')
+            filename = ''
+        # If too many command line inputs are given
+        if len(sys.argv) > 2:
             gripper_control.get_logger().error("Usage: ros2 run data_collection <filename>")
             rclpy.shutdown()
             return 

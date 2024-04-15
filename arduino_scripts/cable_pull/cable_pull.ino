@@ -13,7 +13,8 @@ int buttonState = 0;
 int lastButtonState = 0;
 
 // Initialize initial seatment
-String command = "SEATED";
+//String command = "SEATED";
+uint16_t command = 1;
 
 void setup() {
   // Set up stepper motor
@@ -36,12 +37,12 @@ void loop() {
   if (reading != lastButtonState) {
     if (reading == LOW) {
       // Button is pressed, send status to serial
-      Serial.println("UNSEATED");
+      Serial.println(0);
       delay(200);
       stepper.stop(); // Stop the motor
     } else {
       // Button is released, send status to serial
-      Serial.println("SEATED");
+      Serial.println(1);
       stepper.stop(); // Stop the motor
     }
     delay(100); // Debounce delay
@@ -50,14 +51,15 @@ void loop() {
   lastButtonState = reading;
 
   // Check for serial commands
-  if (Serial.available() > 0) {
-    command = Serial.readStringUntil('\n');
-    if (command == "PULL") {
-      // Move motor in one direction
+  if (Serial.available() >= 2) {
+    uint16_t received_value;
+    Serial.readBytes((char*)&received_value, 2);
+    if (received_value == 2) {
+      // Move motor in one direction (PULL)
       stepper.moveTo(1500);
     }
-    if (command == "HOME") {
-      // Move motor in the other direction
+    if (received_value == 3) {
+      // Move motor in the other direction (HOME)
       stepper.moveTo(-1500);
     }
   }
