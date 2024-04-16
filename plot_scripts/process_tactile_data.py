@@ -135,13 +135,16 @@ class PlotPapillarrayForce:
         cable_status = self.extract_columns(header_starts_with=('cable_status'))
         grip_force = self.extract_columns(header_starts_with=('gripper_current'))
 
+        # Convert NaN values to zero
+        # cable_status = np.nan_to_num(cable_status, nan=1)
+        grip_force = np.nan_to_num(grip_force)
+
         fig, ax1 = plt.subplots()
 
         # Plot grip_force on the right y-axis
         color = 'tab:red'
         ax1.set_xlabel('Time')
         ax1.set_ylabel('Grip Force', color=color)
-        print(grip_force)
         ax1.plot(self.timestamp, grip_force, color=color, label='Grip Force')
         ax1.tick_params(axis='y', labelcolor=color)
 
@@ -161,14 +164,9 @@ class PlotPapillarrayForce:
         ax2.set_ylabel('Global Force', color='tab:blue')
         ax2.tick_params(axis='y', labelcolor='tab:blue')
 
-        # Shade the region where cable_status is 'UNSEATED' (0) or 'SEATED' (1)
-        for i in range(len(cable_status)):
-            if cable_status[i] == 0:
-                ax1.axvspan(self.timestamp[i], self.timestamp[i+1], color='grey', alpha=0.3)
-                ax1.text(self.timestamp[i], ax1.get_ylim()[0], 'Unseated', verticalalignment='bottom')
-            else:
-                ax1.axvspan(self.timestamp[i], self.timestamp[i+1], color='lightgrey', alpha=0.3)
-                ax1.text(self.timestamp[i], ax1.get_ylim()[0], 'Seated', verticalalignment='bottom')
+        # Fill between cable status 0 and 1
+        ax1.fill_between(np.squeeze(self.timestamp), np.min(grip_force), np.max(grip_force), where=(np.squeeze(cable_status) == 0), color='darkgrey', alpha=0.5, label='Cable Status 0')
+        ax1.fill_between(np.squeeze(self.timestamp), np.min(grip_force), np.max(grip_force), where=(np.squeeze(cable_status) == 1), color='lightgrey', alpha=0.5, label='Cable Status 1')
 
         # Combine legend for both axes
         lines, labels = ax1.get_legend_handles_labels()
@@ -179,7 +177,7 @@ class PlotPapillarrayForce:
 
 
 if __name__ == '__main__':
-    filename = '/home/marcus/IMML/ros2_ws/src/IMML_cable_follow/trial_control/trial_control/resource/new.csv'    
+    filename = '/home/marcus/IMML/ros2_ws/src/IMML_cable_follow/trial_control/trial_control/resource/1.csv'    
     pltforce = PlotPapillarrayForce(filename)
 
     # pltforce.plot_xyz_force()

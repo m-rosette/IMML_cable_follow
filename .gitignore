@@ -3,4 +3,6 @@
 
 src/IMML_cable_follow/trial_control/trial_control/resource/*.csv
 
-cable_pose/model_data
+src/IMML_cable_follow/cable_pose/model_data
+
+src/IMML_cable_follow/trial_control/trial_control/trial_control/scratch.py

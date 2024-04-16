@@ -21,12 +21,12 @@ class TactileSlipCheck(Node):
         self.tactile_slip_srv = self.create_service(TactileSlip, 'tactile_slip', self.tactile_slip_callback)
 
     def tactile_0_callback(self, tac_msg):
-        # self.tactile_0_slipstate = [pillar[i].slip_state for pillar in tac_msg.pillars[i]]
+        self.tactile_0_slipstate.clear()  # Clear the list before appending new values
         for i in range(9):
             self.tactile_0_slipstate.append(tac_msg.pillars[i].slip_state)
 
     def tactile_1_callback(self, tac_msg):
-        # self.tactile_1_slipstate = [pillar[i].slip_state for pillar in tac_msg.pillars[i]]
+        self.tactile_1_slipstate.clear()  # Clear the list before appending new values
         for i in range(9):
             self.tactile_1_slipstate.append(tac_msg.pillars[i].slip_state)
 

@@ -1,5 +1,6 @@
 import rclpy
 from rclpy.node import Node
+from std_msgs.msg import Int16
 from trial_control_msgs.srv import LinearActuator, CableState
 import serial
 
@@ -10,18 +11,25 @@ class LinearActuatorControl(Node):
     def __init__(self):
         super().__init__('linear_actuator')
         self.get_logger().info("Starting linear actuator control")
-        self.srv = self.create_service(LinearActuator, 'linear_actuator_control', self.linear_actuator_callback)
 
+        # Assuming the cable starts seated (1)
+        self.cable_state = 1
+
+        # Create publisher for cable status
+        self.cable_status_pub = self.create_publisher(Int16, 'cable_status', 1)
+        self.cable_status_timer = self.create_timer(0.1, self.cable_status_pub_callback)
+
+        # Create services
+        self.linear_actuator_srv = self.create_service(LinearActuator, 'linear_actuator_control', self.linear_actuator_callback)
         self.cable_state_srv = self.create_service(CableState, 'cable_state', self.cable_state_callback)
 
         # Define Arduino serial port and baud rate
-        self.arduino_port = '/dev/ttyACM1'   # Change this to the correct port
+        self.arduino_port = '/dev/ttyACM1'
         self.baudrate = 115200
 
         # Open the serial connection to Arduino
         self.arduino = serial.Serial(self.arduino_port, self.baudrate, timeout=1)
 
-        self.cable_state = None
 
     def linear_actuator_callback(self, request, response):
         self.get_logger().info('Received movement request')
@@ -51,6 +59,11 @@ class LinearActuatorControl(Node):
         response.state = self.cable_state
             
         return response
+    
+    def cable_status_pub_callback(self):
+        msg = Int16()
+        msg.data = self.cable_state
+        self.cable_status_pub.publish(msg)
         
 
 def main(args=None):

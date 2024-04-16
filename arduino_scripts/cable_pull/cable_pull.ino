@@ -9,11 +9,12 @@
 AccelStepper stepper(AccelStepper::DRIVER, STEP_PIN, DIR_PIN);
 
 // Define variables for button state
-int buttonState = 0;
-int lastButtonState = 0;
+int buttonState = LOW;         // current state of the button
+int lastButtonState = LOW;     // previous state of the button
+unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
+unsigned long debounceDelay = 50;    // the debounce time; increase if the output flickers
 
 // Initialize initial seatment
-//String command = "SEATED";
 uint16_t command = 1;
 
 void setup() {
@@ -22,7 +23,7 @@ void setup() {
   stepper.setAcceleration(500); // Set your desired acceleration
   
   // Set up button pin
-  pinMode(BUTTON_PIN, OUTPUT);
+  pinMode(BUTTON_PIN, OUTPUT); // Using internal pull-up resistor
   
   // Initialize serial communication
   Serial.begin(115200);
@@ -31,21 +32,32 @@ void setup() {
 }
 
 void loop() {
-  // Check button state
+  // Check button state with debounce
   int reading = digitalRead(BUTTON_PIN);
   
+  // If the reading is different from the last state, reset the debounce timer
   if (reading != lastButtonState) {
-    if (reading == LOW) {
-      // Button is pressed, send status to serial
-      Serial.println(0);
-      delay(200);
-      stepper.stop(); // Stop the motor
-    } else {
-      // Button is released, send status to serial
-      Serial.println(1);
-      stepper.stop(); // Stop the motor
+    lastDebounceTime = millis();
+  }
+  
+  // If the debounce time has passed, and the reading is still different, consider it valid
+  if ((millis() - lastDebounceTime) > debounceDelay) {
+    // If the button state has changed, update it
+    if (reading != buttonState) {
+      buttonState = reading;
+      
+      // If the button state is LOW, it's pressed
+      if (buttonState == LOW) {
+        // Button is pressed, send status to serial
+        Serial.println(0);
+        delay(200);
+        stepper.stop(); // Stop the motor
+      } else {
+        // Button is released, send status to serial
+        Serial.println(1);
+        stepper.stop(); // Stop the motor
+      }
     }
-    delay(100); // Debounce delay
   }
   
   lastButtonState = reading;

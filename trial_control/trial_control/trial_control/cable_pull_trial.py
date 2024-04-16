@@ -3,14 +3,11 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
-from rclpy.executors import MultiThreadedExecutor
 import sys
-import os
 import time
 import threading
 
-from std_msgs.msg import String, Float64, Int16
-from std_srvs.srv import Empty
+from std_msgs.msg import Float64
 from trial_control_msgs.action import RecordData
 from trial_control_msgs.srv import LinearActuator, CableState, TactileSlip
 from dynamixel_control_msgs.srv import SetOperatingMode
@@ -40,15 +37,15 @@ CURRENT_BASED_POSITION_MODE = 5
 # FULLY_OPEN_POS_CB = 101290
 # FULLY_CLOSED_POS_CB = 103390
 
-# # Gripper V2
-# UPPER_POS_BOUND_CB = 4725
-# LOWER_POS_BOUND_CB = 3250
-# FULLY_OPEN_POS_CB = 3250
-# FULLY_CLOSED_POS_CB = 4725
-UPPER_POS_BOUND_CB = 725
-LOWER_POS_BOUND_CB = -800
-FULLY_OPEN_POS_CB = -800
-FULLY_CLOSED_POS_CB = 725
+# # # Gripper V2
+UPPER_POS_BOUND_CB = 4725
+LOWER_POS_BOUND_CB = 3250
+FULLY_OPEN_POS_CB = 3250
+FULLY_CLOSED_POS_CB = 4725
+# UPPER_POS_BOUND_CB = 725
+# LOWER_POS_BOUND_CB = -800
+# FULLY_OPEN_POS_CB = -800
+# FULLY_CLOSED_POS_CB = 725
 
 class GripperControl(Node):
     def __init__(self):
@@ -59,15 +56,9 @@ class GripperControl(Node):
 
         # Initialize gripper variables
         self.grip_current = OPERATING_CURRENT
-        # self.cable_state = 'SEATED'
         self.cable_state = 1
-        # if self.cable_state == 'SEATED':
-        #     self.cable_state_int = 1
-        # else:
-        #     self.cable_state_int = 0
         self.tactile_0_slipstate = []
         self.tactile_1_slipstate = []         
-        # self.mutex = threading.Lock()
 
         # Create record action client and wait for it to start
         self.record_client = ActionClient(self, RecordData, 'record_server')
@@ -75,11 +66,12 @@ class GripperControl(Node):
 
         # Create publisher for operating current values
         self.motor_current_pub = self.create_publisher(Float64, 'motor_current', 1)
-        self.motor_current_timer = self.create_timer(0.1, self.motor_current_callback)
+        # self.motor_current_timer = self.create_timer(0.1, self.motor_current_callback)
 
-        # Create publisher for cable status
-        self.cable_status_pub = self.create_publisher(Int16, 'cable_status', 1)
-        self.cable_status_timer = self.create_timer(0.1, self.cable_status_pub_callback)
+        # Create a separate thread for publishing motor current
+        self.motor_current_thread = threading.Thread(target=self.publish_motor_current)
+        self.motor_current_thread.daemon = True  # Daemonize the thread
+        self.motor_current_thread.start()
 
         # Create cable status service client
         self.slip_status_client = self.create_client(TactileSlip, 'tactile_slip')
@@ -161,15 +153,13 @@ class GripperControl(Node):
         rclpy.spin_until_future_complete(self, self.slip_status_future)
         return self.slip_status_future.result()
 
-    def motor_current_callback(self):
-        msg = Float64()
-        msg.data = self.grip_current
-        self.motor_current_pub.publish(msg)
-
-    def cable_status_pub_callback(self):       
-        msg = Int16()
-        msg.data = self.cable_state.state
-        self.cable_status_pub.publish(msg)
+    def publish_motor_current(self):
+        # Function to publish motor current at regular intervals
+        while rclpy.ok():
+            msg = Float64()
+            msg.data = self.grip_current
+            self.motor_current_pub.publish(msg)
+            time.sleep(0.1) # essentially the publishing rate
 
     def get_cable_status(self):
         self.get_logger().info("Requesting cable seatment status")
@@ -239,24 +229,21 @@ class GripperControl(Node):
 
         # Make sure gripper is open
         self.grip_current = 25.0
-        # self.grip_current = 5.0
         self.get_logger().info("Opening gripper")
         self.send_motor_request(CURRENT_BASED_POSITION_MODE, 5.0, FULLY_OPEN_POS_CB)
         time.sleep(0.25)
 
         # Bias the tactile data
         self.bias_tactile()
-        # time.sleep(0.25)
+        time.sleep(0.25)
 
         # Send the filename to the record action (starts recording)
         self.save_gripper_data(filename)
-
         time.sleep(2.5)
 
         # Close the gripper
         self.get_logger().info("Closing gripper")
         self.send_motor_request(CURRENT_BASED_POSITION_MODE, self.grip_current, FULLY_CLOSED_POS_CB)  
-
         time.sleep(2)
 
         # Start slip detection controller - Only once tactile sensors have initial contact
