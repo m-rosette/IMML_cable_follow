@@ -48,4 +48,10 @@ def generate_launch_description():
             name='slip_check',
         ),
 
+        # Start the global check node
+        Node(
+            package='trial_control',
+            executable='global_check',
+            name='global_check',
+        ),
 ])

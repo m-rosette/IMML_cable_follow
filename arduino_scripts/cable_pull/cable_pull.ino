@@ -74,6 +74,10 @@ void loop() {
       // Move motor in the other direction (HOME)
       stepper.moveTo(-1500);
     }
+    if (received_value == 4) {
+      // Motor stop
+      stepper.stop();
+    }
   }
 
   // If motor is moving, update its position

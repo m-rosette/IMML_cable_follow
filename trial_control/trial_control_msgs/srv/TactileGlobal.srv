@@ -1,0 +1,6 @@
+# Request
+
+---
+# Response
+float32[] tactile0_global
+float32[] tactile1_global

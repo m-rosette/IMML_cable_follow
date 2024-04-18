@@ -29,6 +29,7 @@ setup(
             'linear_actuator=trial_control.linear_actuator:main',
             'data_collection=trial_control.data_collection:main',
             'slip_check=trial_control.slip_check:main',
+            'global_check=trial_control.global_check:main',
             'cable_pull_trial=trial_control.cable_pull_trial:main',
         ],
     },

@@ -12,6 +12,7 @@ class PlotPapillarrayForce:
         self.num_pillars = 9
         self.num_dim = 3
         self.num_global = 6
+        self.add_plot_region_bound = 5
 
         self.data = self.load_data(filename)
         self.timestamp = np.array(self.extract_columns(header_starts_with=('timestamp')))
@@ -145,7 +146,7 @@ class PlotPapillarrayForce:
         color = 'tab:red'
         ax1.set_xlabel('Time')
         ax1.set_ylabel('Grip Force', color=color)
-        ax1.plot(self.timestamp, grip_force, color=color, label='Grip Force')
+        ax1.plot(self.timestamp, grip_force, color=color, label='Grip Force', linestyle=':', linewidth=3)
         ax1.tick_params(axis='y', labelcolor=color)
 
         # Create a second y-axis for global force
@@ -153,20 +154,34 @@ class PlotPapillarrayForce:
 
         # Plot global_force for array 0
         ax2.plot(self.timestamp, self.global_force[0, :, 0], label='Array 0 - Global X', linestyle='--')
-        ax2.plot(self.timestamp, self.global_force[0, :, 1], label='Array 0 - Global Y', linestyle='--')
-        ax2.plot(self.timestamp, self.global_force[0, :, 2], label='Array 0 - Global Z', linestyle='--')
+        ax2.plot(self.timestamp, self.global_force[0, :, 1], label='Array 0 - Global Y', linestyle='-.')
+        ax2.plot(self.timestamp, self.global_force[0, :, 2], label='Array 0 - Global Z', linestyle='-')
 
         # Plot global_force for array 1
-        ax2.plot(self.timestamp, self.global_force[1, :, 0], label='Array 1 - Global X', linestyle='-.')
+        ax2.plot(self.timestamp, self.global_force[1, :, 0], label='Array 1 - Global X', linestyle='--')
         ax2.plot(self.timestamp, self.global_force[1, :, 1], label='Array 1 - Global Y', linestyle='-.')
-        ax2.plot(self.timestamp, self.global_force[1, :, 2], label='Array 1 - Global Z', linestyle='-.')
+        ax2.plot(self.timestamp, self.global_force[1, :, 2], label='Array 1 - Global Z', linestyle='-')
 
         ax2.set_ylabel('Global Force', color='tab:blue')
         ax2.tick_params(axis='y', labelcolor='tab:blue')
 
         # Fill between cable status 0 and 1
-        ax1.fill_between(np.squeeze(self.timestamp), np.min(grip_force), np.max(grip_force), where=(np.squeeze(cable_status) == 0), color='darkgrey', alpha=0.5, label='Cable Status 0')
-        ax1.fill_between(np.squeeze(self.timestamp), np.min(grip_force), np.max(grip_force), where=(np.squeeze(cable_status) == 1), color='lightgrey', alpha=0.5, label='Cable Status 1')
+        ax1.fill_between(np.squeeze(self.timestamp), np.min(grip_force)-self.add_plot_region_bound, np.max(grip_force)+self.add_plot_region_bound, where=(np.squeeze(cable_status) == 0), color='darkgrey', alpha=0.5) #, label='Cable Status 0')
+        ax1.fill_between(np.squeeze(self.timestamp), np.min(grip_force)-self.add_plot_region_bound, np.max(grip_force)+self.add_plot_region_bound, where=(np.squeeze(cable_status) == 1), color='lightgrey', alpha=0.5) #, label='Cable Status 1')
+
+        try:
+            # Find the indices where cable status is 0
+            cable_status_0_indices = np.where(np.squeeze(cable_status) == 0)[0]
+            xmin_status_0 = self.timestamp[cable_status_0_indices[0]]
+            xmax_status_0 = self.timestamp[cable_status_0_indices[-1]]
+
+            # Position the text box within the shaded regions
+            ax1.text((xmin_status_0 + xmax_status_0) / 2, np.min(grip_force)-self.add_plot_region_bound, "Cable Unseated", horizontalalignment='center', verticalalignment='bottom')
+            ax1.text((self.timestamp[0] + xmin_status_0) / 2, np.min(grip_force)-self.add_plot_region_bound, 'Cable Seated', horizontalalignment='center', verticalalignment='bottom')
+            ax1.text((self.timestamp[-1] + xmax_status_0) / 2, np.min(grip_force)-self.add_plot_region_bound, 'Cable Seated', horizontalalignment='center', verticalalignment='bottom')
+        
+        except IndexError:
+            pass
 
         # Combine legend for both axes
         lines, labels = ax1.get_legend_handles_labels()
@@ -177,7 +192,7 @@ class PlotPapillarrayForce:
 
 
 if __name__ == '__main__':
-    filename = '/home/marcus/IMML/ros2_ws/src/IMML_cable_follow/trial_control/trial_control/resource/1.csv'    
+    filename = '/home/marcus/IMML/ros2_ws/src/IMML_cable_follow/trial_control/trial_control/resource/test5.csv'    
     pltforce = PlotPapillarrayForce(filename)
 
     # pltforce.plot_xyz_force()
