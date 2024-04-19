@@ -40,14 +40,14 @@ CURRENT_BASED_POSITION_MODE = 5
 # FULLY_CLOSED_POS_CB = 103390
 
 # # # Gripper V2
-UPPER_POS_BOUND_CB = 4725
-LOWER_POS_BOUND_CB = 3250
-FULLY_OPEN_POS_CB = 3250
-FULLY_CLOSED_POS_CB = 4725
-# UPPER_POS_BOUND_CB = 725
-# LOWER_POS_BOUND_CB = -800
-# FULLY_OPEN_POS_CB = -800
-# FULLY_CLOSED_POS_CB = 725
+# UPPER_POS_BOUND_CB = 4725
+# LOWER_POS_BOUND_CB = 3250
+# FULLY_OPEN_POS_CB = 3250
+# FULLY_CLOSED_POS_CB = 4725
+UPPER_POS_BOUND_CB = 725
+LOWER_POS_BOUND_CB = -800
+FULLY_OPEN_POS_CB = -800
+FULLY_CLOSED_POS_CB = 725
 
 class GripperControl(Node):
     def __init__(self):
@@ -57,14 +57,15 @@ class GripperControl(Node):
         self.get_logger().info("Gripper Control node started")
 
         # Initialize gripper variables
-        self.grip_current = OPERATING_CURRENT
+        self.grip_current = 18.0
+        self.grip_force_increment = 0.5
         self.cable_state = 1
         self.tactile_0_slipstate = []
         self.tactile_1_slipstate = []   
         self.tactile_0_global_xyz = []
         self.tactile_1_global_xyz = []
         self.declare_parameter("global_x_max", 4.0)   
-        self.declare_parameter("global_y_max", 3.5)   
+        self.declare_parameter("global_y_max", 5.0)   
         self.declare_parameter("global_z_max", 7.0)  
         self.global_z_exceeded = False
         self.global_y_exceeded = False    
@@ -249,7 +250,7 @@ class GripperControl(Node):
         # self.get_logger().info(f"Global y: {global_y_threshold}, Global z {global_z_threshold}")
 
         # Make sure gripper is open
-        self.grip_current = 25.0
+        # self.grip_current = 25.0
         self.get_logger().info("Opening gripper")
         self.send_motor_request(CURRENT_BASED_POSITION_MODE, 5.0, FULLY_OPEN_POS_CB)
         time.sleep(0.25)
@@ -284,6 +285,7 @@ class GripperControl(Node):
             self.global_force = self.get_global_tactile_threshold_status()
             self.tactile_0_global_xyz = self.global_force.tactile0_global
             self.tactile_1_global_xyz = self.global_force.tactile1_global
+            time.sleep(0.1)
 
             # self.get_logger().info(f'Sensed global_0_z: {self.tactile_0_global_xyz[2]}, Sensed global_1_z: {self.tactile_1_global_xyz[2]}')
             if self.tactile_0_global_xyz[2] > global_z_threshold or self.tactile_1_global_xyz[2] > global_z_threshold:
@@ -300,13 +302,13 @@ class GripperControl(Node):
             self.tactile_0_slipstate = self.slip_state.tactile0_slip
             self.tactile_1_slipstate = self.slip_state.tactile1_slip
 
-            # If slip is detected, increase grip current
-            if self.grip_current > max_grip:
-                self.get_logger().warn('max grip reached')
-                break
+            # # If slip is detected, increase grip current
+            # if self.grip_current > max_grip:
+            #     self.get_logger().warn('max grip reached')
+            #     break
 
             if any(slip_num == 3 for slip_num in self.tactile_0_slipstate) or any(slip_num == 3 for slip_num in self.tactile_1_slipstate):
-                self.grip_current += 0.1
+                self.grip_current += self.grip_force_increment
                 self.get_logger().info(f"Slip detected [New Current Goal: {self.grip_current}]")
                 self.send_motor_request(CURRENT_BASED_POSITION_MODE, self.grip_current, FULLY_CLOSED_POS_CB) 
             
@@ -368,10 +370,10 @@ def main(args=None):
 
     gripper_control.run(filename)    
 
-    # # Use a MultiThreadedExecutor to enable processing goals concurrently
-    # executor = MultiThreadedExecutor()
-    # rclpy.spin(gripper_control, executor=executor)
-    rclpy.spin(gripper_control)
+    # Use a MultiThreadedExecutor to enable processing goals concurrently
+    executor = MultiThreadedExecutor()
+    rclpy.spin(gripper_control, executor=executor)
+    # rclpy.spin(gripper_control)
 
     # Shutdown everything cleanly
     rclpy.shutdown()

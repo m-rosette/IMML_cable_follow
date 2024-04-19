@@ -29,9 +29,11 @@ void setup() {
   Serial.begin(115200);
 
 //  Serial.println(button_value, stepper.currentPosition());
+//  Serial.print('[');
   Serial.print(button_value);
   Serial.print(',');
-  Serial.print(stepper.currentPosition());
+  Serial.println(stepper.currentPosition());
+//  Serial.println(']');
 }
 
 void loop() {
@@ -69,9 +71,11 @@ void loop() {
 
   // Publish button state and current stepper position to serial
 //  Serial.println(button_value, stepper.currentPosition());
+//  Serial.print('[');
   Serial.print(button_value);
   Serial.print(',');
   Serial.println(stepper.currentPosition());
+//  Serial.println(']');
 
   // Check for serial commands
   if (Serial.available() >= 2) {
