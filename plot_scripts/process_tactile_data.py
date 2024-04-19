@@ -153,12 +153,12 @@ class PlotPapillarrayForce:
         ax2 = ax1.twinx()
 
         # Plot global_force for array 0
-        ax2.plot(self.timestamp, self.global_force[0, :, 0], label='Array 0 - Global X', linestyle='--')
+        # ax2.plot(self.timestamp, self.global_force[0, :, 0], label='Array 0 - Global X', linestyle='--')
         ax2.plot(self.timestamp, self.global_force[0, :, 1], label='Array 0 - Global Y', linestyle='-.')
         ax2.plot(self.timestamp, self.global_force[0, :, 2], label='Array 0 - Global Z', linestyle='-')
 
         # Plot global_force for array 1
-        ax2.plot(self.timestamp, self.global_force[1, :, 0], label='Array 1 - Global X', linestyle='--')
+        # ax2.plot(self.timestamp, self.global_force[1, :, 0], label='Array 1 - Global X', linestyle='--')
         ax2.plot(self.timestamp, self.global_force[1, :, 1], label='Array 1 - Global Y', linestyle='-.')
         ax2.plot(self.timestamp, self.global_force[1, :, 2], label='Array 1 - Global Z', linestyle='-')
 
@@ -192,7 +192,13 @@ class PlotPapillarrayForce:
 
 
 if __name__ == '__main__':
-    filename = '/home/marcus/IMML/ros2_ws/src/IMML_cable_follow/trial_control/trial_control/resource/test5.csv'    
+    # name = 'test_failed_unseated_middle'
+    # name = 'test_failed_unseated_top'
+    # name = 'global_y_3pt5_exceeded_bottom'
+    # name = 'global_z_6pt0_exceeded_bottom'
+    name = 'what6'
+
+    filename = f'/home/marcus/IMML/ros2_ws/src/IMML_cable_follow/trial_control/trial_control/resource/{name}.csv'    
     pltforce = PlotPapillarrayForce(filename)
 
     # pltforce.plot_xyz_force()

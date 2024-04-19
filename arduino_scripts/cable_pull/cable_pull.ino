@@ -15,7 +15,7 @@ unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
 unsigned long debounceDelay = 50;    // the debounce time; increase if the output flickers
 
 // Initialize initial seatment
-uint16_t command = 1;
+uint16_t button_value = 1;
 
 void setup() {
   // Set up stepper motor
@@ -28,7 +28,10 @@ void setup() {
   // Initialize serial communication
   Serial.begin(115200);
 
-  Serial.println(command);
+//  Serial.println(button_value, stepper.currentPosition());
+  Serial.print(button_value);
+  Serial.print(',');
+  Serial.print(stepper.currentPosition());
 }
 
 void loop() {
@@ -48,19 +51,27 @@ void loop() {
       
       // If the button state is LOW, it's pressed
       if (buttonState == LOW) {
-        // Button is pressed, send status to serial
-        Serial.println(0);
+        // Cable unseated, send status to serial (value=0)
+        button_value = 0;
+//        Serial.println(button_value);
         delay(200);
         stepper.stop(); // Stop the motor
       } else {
-        // Button is released, send status to serial
-        Serial.println(1);
+        // Cable seated, send status to serial (value=1)
+        button_value = 1;
+//        Serial.println(button_value);
         stepper.stop(); // Stop the motor
       }
     }
   }
   
   lastButtonState = reading;
+
+  // Publish button state and current stepper position to serial
+//  Serial.println(button_value, stepper.currentPosition());
+  Serial.print(button_value);
+  Serial.print(',');
+  Serial.println(stepper.currentPosition());
 
   // Check for serial commands
   if (Serial.available() >= 2) {

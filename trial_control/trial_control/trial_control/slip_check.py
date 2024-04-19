@@ -15,8 +15,8 @@ class TactileSlipCheck(Node):
         self.tactile_1_slipstate = []   
 
         # Subscribe to tactile sensor feedback
-        self.tactile_0_sub = self.create_subscription(SensorState, 'hub_0/sensor_0', self.tactile_0_callback, 10)
-        self.tactile_1_sub = self.create_subscription(SensorState, 'hub_0/sensor_1', self.tactile_1_callback, 10)
+        self.tactile_0_sub = self.create_subscription(SensorState, 'hub_0/sensor_0', self.tactile_0_callback, 1)
+        self.tactile_1_sub = self.create_subscription(SensorState, 'hub_0/sensor_1', self.tactile_1_callback, 1)
 
         self.tactile_slip_srv = self.create_service(TactileSlip, 'tactile_slip', self.tactile_slip_callback)
 

@@ -31,6 +31,7 @@ class Record(Node):
         self.gripper_pos_sub = self.create_subscription(Int64, 'present_position', self.gripper_pos_callback, 10)
         self.gripper_current_sub = self.create_subscription(Float64, 'motor_current', self.gripper_current_callback, 10)
         self.cable_status_sub = self.create_subscription(Int16, 'cable_status', self.cable_status_callback, 10)
+        self.stepper_pos_sub = self.create_subscription(Int64, 'stepper_pos', self.stepper_pos_callback, 10)
 
         # Subscribe to tactile sensor feedback
         self.tactile_0_sub = self.create_subscription(SensorState, 'hub_0/sensor_0', self.tactile_0_callback, 10)
@@ -96,6 +97,7 @@ class Record(Node):
         combined_dict.update(self.cable_status)
         combined_dict.update(self.gripper_position)
         combined_dict.update(self.gripper_current)
+        combined_dict.update(self.stepper_pos)
         combined_dict.update(self.tactile_0)
         combined_dict.update(self.tactile_1)
         self.mutex.release()
@@ -164,6 +166,10 @@ class Record(Node):
     def cable_status_callback(self, cable_msg):
         # Saves the subscribed cable status data to variable
         self.cable_status['cable_status'] = cable_msg.data
+    
+    def stepper_pos_callback(self, stepper_msg):
+        # Saves the subscribed stepper pos data to variable
+        self.stepper_pos['stepper_pos'] = stepper_msg.data
 
     def initialize_tactile_dict(self):
         """
@@ -173,6 +179,7 @@ class Record(Node):
         self.cable_status = OrderedDict({'cable_status': None})
         self.gripper_position = OrderedDict({'gripper_pos': None})
         self.gripper_current = OrderedDict({'gripper_current': None})
+        self.stepper_pos = OrderedDict({'stepper_pos': None})
         self.tactile_0 = OrderedDict()
         self.tactile_1 = OrderedDict()
         

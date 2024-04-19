@@ -3,4 +3,5 @@
 ---
 # Response
 # string state
-int16 state
+int16 cable_state
+int64 stepper_position

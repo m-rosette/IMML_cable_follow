@@ -6,6 +6,7 @@ from rclpy.action import ActionClient
 import sys
 import time
 import threading
+import numpy as np
 from rclpy.executors import MultiThreadedExecutor
 
 from std_msgs.msg import Float64
@@ -63,8 +64,8 @@ class GripperControl(Node):
         self.tactile_0_global_xyz = []
         self.tactile_1_global_xyz = []
         self.declare_parameter("global_x_max", 4.0)   
-        self.declare_parameter("global_y_max", 4.0)   
-        self.declare_parameter("global_z_max", 5.0)  
+        self.declare_parameter("global_y_max", 3.5)   
+        self.declare_parameter("global_z_max", 7.0)  
         self.global_z_exceeded = False
         self.global_y_exceeded = False    
 
@@ -89,7 +90,7 @@ class GripperControl(Node):
             self.get_logger().info('waiting for tactile_global service to start')
 
         # Create cable status service client
-        self.cable_status_client = self.create_client(CableState, 'cable_state')
+        self.cable_status_client = self.create_client(CableState, 'cable_pull_jig_state')
         while not self.cable_status_client.wait_for_service(timeout_sec=1):
             self.get_logger().info('waiting for cable_status service to start')
 
@@ -247,11 +248,8 @@ class GripperControl(Node):
         global_z_threshold = self.get_parameter('global_z_max').get_parameter_value().double_value
         # self.get_logger().info(f"Global y: {global_y_threshold}, Global z {global_z_threshold}")
 
-        # Get the current cable state
-        self.cable_state = self.get_cable_status()
-
         # Make sure gripper is open
-        self.grip_current = 18.0
+        self.grip_current = 25.0
         self.get_logger().info("Opening gripper")
         self.send_motor_request(CURRENT_BASED_POSITION_MODE, 5.0, FULLY_OPEN_POS_CB)
         time.sleep(0.25)
@@ -277,7 +275,12 @@ class GripperControl(Node):
         self.get_logger().info("Beginning cable pull")
         self.send_linear_actuator_request(2)
 
-        while self.cable_state.state == 1:
+        max_grip = 40
+
+        # Get the current cable state
+        self.cable_state = self.get_cable_status()
+
+        while self.cable_state.cable_state == 1:
             self.global_force = self.get_global_tactile_threshold_status()
             self.tactile_0_global_xyz = self.global_force.tactile0_global
             self.tactile_1_global_xyz = self.global_force.tactile1_global
@@ -288,7 +291,7 @@ class GripperControl(Node):
                 self.get_logger().warn("Global tactile Z force threshold exceeded. Terminating cable pull")
                 break
             
-            if self.tactile_0_global_xyz[1] > global_y_threshold or self.tactile_1_global_xyz[1] > global_y_threshold:
+            if np.abs(self.tactile_0_global_xyz[1]) > global_y_threshold or np.abs(self.tactile_1_global_xyz[1]) > global_y_threshold:
                 self.global_y_exceeded = True
                 self.get_logger().warn("Global tactile Y force threshold exceeded. Terminating cable pull")
                 break
@@ -298,8 +301,12 @@ class GripperControl(Node):
             self.tactile_1_slipstate = self.slip_state.tactile1_slip
 
             # If slip is detected, increase grip current
+            if self.grip_current > max_grip:
+                self.get_logger().warn('max grip reached')
+                break
+
             if any(slip_num == 3 for slip_num in self.tactile_0_slipstate) or any(slip_num == 3 for slip_num in self.tactile_1_slipstate):
-                self.grip_current += 3
+                self.grip_current += 0.1
                 self.get_logger().info(f"Slip detected [New Current Goal: {self.grip_current}]")
                 self.send_motor_request(CURRENT_BASED_POSITION_MODE, self.grip_current, FULLY_CLOSED_POS_CB) 
             
@@ -328,9 +335,8 @@ class GripperControl(Node):
             self.get_logger().info("Returning home")
             self.send_linear_actuator_request(3)
 
-            while self.cable_state.state == 0:
+            while self.cable_state.cable_state == 0:
                 self.cable_state = self.get_cable_status()
-                self.get_logger().info(f'Cable state: {self.cable_state.state}')
 
             self.get_logger().info("Cable reseated")
             
@@ -362,10 +368,10 @@ def main(args=None):
 
     gripper_control.run(filename)    
 
-    # Use a MultiThreadedExecutor to enable processing goals concurrently
-    executor = MultiThreadedExecutor()
-    rclpy.spin(gripper_control, executor=executor)
-    # rclpy.spin(gripper_control)
+    # # Use a MultiThreadedExecutor to enable processing goals concurrently
+    # executor = MultiThreadedExecutor()
+    # rclpy.spin(gripper_control, executor=executor)
+    rclpy.spin(gripper_control)
 
     # Shutdown everything cleanly
     rclpy.shutdown()

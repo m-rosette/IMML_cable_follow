@@ -1,11 +1,9 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Int16
+from std_msgs.msg import Int16, Int64
 from trial_control_msgs.srv import LinearActuator, CableState
 import serial
-
-from rclpy.executors import MultiThreadedExecutor
-
+import threading
 
 class LinearActuatorControl(Node):
     def __init__(self):
@@ -14,14 +12,19 @@ class LinearActuatorControl(Node):
 
         # Assuming the cable starts seated (1)
         self.cable_state = 1
+        self.current_stepper_pos = 0
 
         # Create publisher for cable status
         self.cable_status_pub = self.create_publisher(Int16, 'cable_status', 1)
         self.cable_status_timer = self.create_timer(0.1, self.cable_status_pub_callback)
 
+        self.stepper_pos_pub = self.create_publisher(Int64, 'stepper_pos', 1)
+        self.stepper_pos_timer = self.create_timer(0.1, self.stepper_pos_pub_callback)
+
         # Create services
         self.linear_actuator_srv = self.create_service(LinearActuator, 'linear_actuator_control', self.linear_actuator_callback)
-        self.cable_state_srv = self.create_service(CableState, 'cable_state', self.cable_state_callback)
+        # self.cable_state_srv = self.create_service(CableState, 'cable_state', self.cable_state_callback)
+        self.cable_pull_jig_state = self.create_service(CableState, 'cable_pull_jig_state', self.cable_pull_jig_state_callback)
 
         # Define Arduino serial port and baud rate
         self.arduino_port = '/dev/ttyACM1'
@@ -30,6 +33,22 @@ class LinearActuatorControl(Node):
         # Open the serial connection to Arduino
         self.arduino = serial.Serial(self.arduino_port, self.baudrate, timeout=1)
 
+        # Start a separate thread for reading data from the serial port
+        self.serial_thread = threading.Thread(target=self.serial_read_thread)
+        self.serial_thread.daemon = True  # Set as daemon so it terminates with main thread
+        self.serial_thread.start()
+
+    def serial_read_thread(self):
+        while rclpy.ok():
+            # Get cable seatment status
+            line = self.arduino.readline().strip()
+            cable_pull_jig_status = line.split(b',')
+
+            # Check if the received line contains valid data
+            if len(cable_pull_jig_status) == 2 and cable_pull_jig_status[0]:
+                cable_status_coded, current_stepper_pos_coded = cable_pull_jig_status
+                self.cable_state = int(cable_status_coded.decode())
+                self.current_stepper_pos = int(current_stepper_pos_coded.decode())
 
     def linear_actuator_callback(self, request, response):
         self.get_logger().info('Received movement request')
@@ -47,32 +66,30 @@ class LinearActuatorControl(Node):
 
         return response
     
-    def cable_state_callback(self, request, response):
-        # Get cable seatment status
-        cable_status = self.arduino.readline().decode().split('\r')
-        self.get_logger().info(cable_status[0])
-        if cable_status[0] != "":
-            self.cable_state = int(cable_status[0])  # Convert to integer
-
-        self.get_logger().info(f"Cable state: {self.cable_state}")
-
-        response.state = self.cable_state
-            
+    # def cable_state_callback(self, request, response):
+    #     response.state = self.cable_state
+    #     return response
+    
+    def cable_pull_jig_state_callback(self, request, response):
+        response.cable_state = self.cable_state
+        response.stepper_position = self.current_stepper_pos
         return response
     
     def cable_status_pub_callback(self):
         msg = Int16()
         msg.data = self.cable_state
         self.cable_status_pub.publish(msg)
+
+    def stepper_pos_pub_callback(self):
+        msg = Int64()
+        msg.data = self.current_stepper_pos
+        self.stepper_pos_pub.publish(msg)
         
 
 def main(args=None):
     rclpy.init(args=args)
     linear_actuator = LinearActuatorControl()
-
-    # Use a MultiThreadedExecutor to enable processing goals concurrently
-    executor = MultiThreadedExecutor()
-    rclpy.spin(linear_actuator, executor=executor)
+    rclpy.spin(linear_actuator)
     rclpy.shutdown()
 
 
