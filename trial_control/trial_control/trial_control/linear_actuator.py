@@ -1,10 +1,10 @@
+#!/usr/bin/env python3
+
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Int16, Int64
-from trial_control_msgs.srv import LinearActuator, CableState
+from trial_control_msgs.srv import LinearActuator, CablePullJigState
 import serial
-import threading
-import time
 from rclpy.executors import MultiThreadedExecutor
 
 
@@ -16,20 +16,17 @@ class LinearActuatorControl(Node):
         # Assuming the cable starts seated (1)
         self.cable_state = 1
         self.current_stepper_pos = 0
+        self.jig_status_list = []
 
-        # Create publisher for cable status
-        self.cable_status_pub = self.create_publisher(Int16, 'cable_status', 1)
-        # self.cable_status_timer = self.create_timer(0.1, self.cable_status_pub_callback)
+        # Create publisher for cable jig status
+        self.cable_status_pub = self.create_publisher(Int16, 'cable_status', 10)
+        self.stepper_pos_pub = self.create_publisher(Int64, 'stepper_pos', 10)
 
-        self.stepper_pos_pub = self.create_publisher(Int64, 'stepper_pos', 1)
-        # self.stepper_pos_timer = self.create_timer(0.1, self.stepper_pos_pub_callback)
-
-        self.cable_pull_jig_timer = self.create_timer(0.01, self.cable_pull_jig_timer_callback)
+        self.cable_pull_jig_timer = self.create_timer(0.005, self.cable_pull_jig_timer_callback)
 
         # Create services
         self.linear_actuator_srv = self.create_service(LinearActuator, 'linear_actuator_control', self.linear_actuator_callback)
-        # self.cable_state_srv = self.create_service(CableState, 'cable_state', self.cable_state_callback)
-        self.cable_pull_jig_state = self.create_service(CableState, 'cable_pull_jig_state', self.cable_pull_jig_state_callback)
+        self.cable_pull_jig_state = self.create_service(CablePullJigState, 'cable_pull_jig_state', self.cable_pull_jig_state_callback)
 
         # Define Arduino serial port and baud rate
         self.arduino_port = '/dev/ttyACM1'
@@ -37,25 +34,6 @@ class LinearActuatorControl(Node):
 
         # Open the serial connection to Arduino
         self.arduino = serial.Serial(self.arduino_port, self.baudrate, timeout=1)
-
-        # self.cable_pull_jig_check()
-        # # Start a separate thread for reading data from the serial port
-        # self.serial_thread = threading.Thread(target=self.serial_read_thread)
-        # self.serial_thread.daemon = True  # Set as daemon so it terminates with main thread
-        # self.serial_thread.start()
-
-    # def serial_read_thread(self):
-    #     while rclpy.ok():
-    #         # MAKE SURE TO DO A CHECK IF SOMETHING IS AVAILABLE
-    #         # Get cable seatment status
-    #         line = self.arduino.readline().strip()
-    #         cable_pull_jig_status = line.split(b',')
-
-    #         # Check if the received line contains valid data
-    #         if len(cable_pull_jig_status) == 2 and cable_pull_jig_status[0]:
-    #             cable_status_coded, current_stepper_pos_coded = cable_pull_jig_status
-    #             self.cable_state = int(cable_status_coded.decode())
-    #             self.current_stepper_pos = int(current_stepper_pos_coded.decode())
 
     def linear_actuator_callback(self, request, response):
         self.get_logger().info('Received movement request')
@@ -73,16 +51,17 @@ class LinearActuatorControl(Node):
 
         return response
     
-    # def cable_state_callback(self, request, response):
-    #     response.state = self.cable_state
-    #     return response
-
     def cable_pull_jig_timer_callback(self):
         if self.arduino.in_waiting > 0:
-            line = self.arduino.read(size=self.arduino.in_waiting).strip()#.split(b',')
-            cable_pull_jig_status = line.split(b'\r\n')
+            cable_pull_jig_status = self.arduino.read(size=self.arduino.in_waiting).strip().split(b'\r\n')
+
+            # Append the latest two readings and pop the rest - helps catch and missreadings
+            self.jig_status_list.extend(cable_pull_jig_status[-2:])
+            if len(self.jig_status_list) > 2:
+                self.jig_status_list = self.jig_status_list[-2:]
             
-            cable_status_coded, current_stepper_pos_coded = cable_pull_jig_status[-3].decode().split(',')
+            # cable_status_coded, current_stepper_pos_coded = cable_pull_jig_status[-4].decode().split(',')
+            cable_status_coded, current_stepper_pos_coded = self.jig_status_list[0].decode().split(',')
             self.cable_state = int(cable_status_coded)
             self.current_stepper_pos = int(current_stepper_pos_coded)
 

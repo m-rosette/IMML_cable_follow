@@ -9,9 +9,9 @@ import threading
 import numpy as np
 from rclpy.executors import MultiThreadedExecutor
 
-from std_msgs.msg import Float64
+from std_msgs.msg import Float64, Int64
 from trial_control_msgs.action import RecordData
-from trial_control_msgs.srv import LinearActuator, CableState, TactileSlip, TactileGlobal
+from trial_control_msgs.srv import LinearActuator, CablePullJigState, TactileSlip, TactileGlobal
 from dynamixel_control_msgs.srv import SetOperatingMode
 from sensor_interfaces.srv import BiasRequest, StartSlipDetection, StopSlipDetection
 from sensor_interfaces.msg import SensorState
@@ -40,14 +40,14 @@ CURRENT_BASED_POSITION_MODE = 5
 # FULLY_CLOSED_POS_CB = 103390
 
 # # # Gripper V2
-# UPPER_POS_BOUND_CB = 4725
-# LOWER_POS_BOUND_CB = 3250
-# FULLY_OPEN_POS_CB = 3250
-# FULLY_CLOSED_POS_CB = 4725
-UPPER_POS_BOUND_CB = 725
-LOWER_POS_BOUND_CB = -800
-FULLY_OPEN_POS_CB = -800
-FULLY_CLOSED_POS_CB = 725
+UPPER_POS_BOUND_CB = 4725
+LOWER_POS_BOUND_CB = 3250
+FULLY_OPEN_POS_CB = 3250
+FULLY_CLOSED_POS_CB = 4725
+# UPPER_POS_BOUND_CB = 725
+# LOWER_POS_BOUND_CB = -800
+# FULLY_OPEN_POS_CB = -800
+# FULLY_CLOSED_POS_CB = 725
 
 class GripperControl(Node):
     def __init__(self):
@@ -58,8 +58,10 @@ class GripperControl(Node):
 
         # Initialize gripper variables
         self.grip_current = 18.0
-        self.grip_force_increment = 0.5
-        self.cable_state = 1
+        self.grip_force_increment = 2
+        self.grip_max = 65
+        self.current_gripper_pos = None
+        # self.cable_pull_jig_state = None
         self.tactile_0_slipstate = []
         self.tactile_1_slipstate = []   
         self.tactile_0_global_xyz = []
@@ -69,6 +71,12 @@ class GripperControl(Node):
         self.declare_parameter("global_z_max", 7.0)  
         self.global_z_exceeded = False
         self.global_y_exceeded = False    
+
+        # Initialize sliding window slope variables
+        self.preset_slope = 0.0035    # Set your desired preset slope
+        self.window_size = 10
+        self.numerator_diff = []
+        self.denominator_diff = []
 
         # Create record action client and wait for it to start
         self.record_client = ActionClient(self, RecordData, 'record_server')
@@ -80,6 +88,9 @@ class GripperControl(Node):
         self.motor_current_thread.daemon = True
         self.motor_current_thread.start()
 
+        # # Subscribe to gripper position and current and cable seatment status
+        # self.gripper_pos_sub = self.create_subscription(Int64, 'present_position', self.gripper_pos_callback, 10)
+
         # Create cable status service client
         self.slip_status_client = self.create_client(TactileSlip, 'tactile_slip')
         while not self.slip_status_client.wait_for_service(timeout_sec=1):
@@ -90,9 +101,9 @@ class GripperControl(Node):
         while not self.tactile_global_client.wait_for_service(timeout_sec=1):
             self.get_logger().info('waiting for tactile_global service to start')
 
-        # Create cable status service client
-        self.cable_status_client = self.create_client(CableState, 'cable_pull_jig_state')
-        while not self.cable_status_client.wait_for_service(timeout_sec=1):
+        # Create cable pull jig status service client
+        self.cable_pull_jig_status_client = self.create_client(CablePullJigState, 'cable_pull_jig_state')
+        while not self.cable_pull_jig_status_client.wait_for_service(timeout_sec=1):
             self.get_logger().info('waiting for cable_status service to start')
 
         # Create dynamixel service client
@@ -166,7 +177,7 @@ class GripperControl(Node):
         return self.slip_status_future.result()
     
     def get_global_tactile_threshold_status(self):
-        self.get_logger().info("Requesting tactile global theshold status")
+        # self.get_logger().info("Requesting tactile global theshold status")
 
         request = TactileGlobal.Request()
 
@@ -180,16 +191,16 @@ class GripperControl(Node):
             msg = Float64()
             msg.data = self.grip_current
             self.motor_current_pub.publish(msg)
-            time.sleep(0.1) # essentially the publishing rate
+            time.sleep(0.01) # essentially the publishing rate
 
-    def get_cable_status(self):
-        self.get_logger().info("Requesting cable seatment status")
+    def get_cable_pull_jig_status(self):
+        # self.get_logger().info("Requesting cable seatment status")
 
-        request = CableState.Request()
+        request = CablePullJigState.Request()
 
-        self.cable_state_future = self.cable_status_client.call_async(request)
-        rclpy.spin_until_future_complete(self, self.cable_state_future)
-        return self.cable_state_future.result()
+        self.cable_pull_jig_state_future = self.cable_pull_jig_status_client.call_async(request)
+        rclpy.spin_until_future_complete(self, self.cable_pull_jig_state_future)
+        return self.cable_pull_jig_state_future.result()
 
     def send_linear_actuator_request(self, command):
         self.get_logger().info(f"Requested linear actuator position: {command}")
@@ -243,14 +254,29 @@ class GripperControl(Node):
             goal_position = LOWER_POS_BOUND_CB
 
         return goal_current, goal_position
+    
+    def slip_check(self, x_data, y_data):
+        self.numerator_diff = np.diff(y_data[-self.window_size-1:])
+        self.denominator_diff = np.diff(x_data[-self.window_size-1:])
+        
+        # Calculate slope if there is no division by zero
+        if len(self.numerator_diff) >= self.window_size:
+            avg_num_diff = np.mean(self.numerator_diff)
+            avg_denom_diff = np.mean(self.denominator_diff)
+            if avg_denom_diff != 0:
+                return avg_num_diff / avg_denom_diff
+        return None
 
     def run(self, filename):
         global_y_threshold = self.get_parameter('global_y_max').get_parameter_value().double_value
         global_z_threshold = self.get_parameter('global_z_max').get_parameter_value().double_value
-        # self.get_logger().info(f"Global y: {global_y_threshold}, Global z {global_z_threshold}")
+
+        # Initialize lists to store data for slope calculation
+        stepper_pos = []
+        global_y_tactile_0 = []
+        global_y_tactile_1 = []
 
         # Make sure gripper is open
-        # self.grip_current = 25.0
         self.get_logger().info("Opening gripper")
         self.send_motor_request(CURRENT_BASED_POSITION_MODE, 5.0, FULLY_OPEN_POS_CB)
         time.sleep(0.25)
@@ -276,12 +302,12 @@ class GripperControl(Node):
         self.get_logger().info("Beginning cable pull")
         self.send_linear_actuator_request(2)
 
-        max_grip = 40
-
         # Get the current cable state
-        self.cable_state = self.get_cable_status()
+        self.cable_pull_jig_state = self.get_cable_pull_jig_status()
 
-        while self.cable_state.cable_state == 1:
+        while self.cable_pull_jig_state.cable_state == 1:
+            self.cable_pull_jig_state = self.get_cable_pull_jig_status()
+
             self.global_force = self.get_global_tactile_threshold_status()
             self.tactile_0_global_xyz = self.global_force.tactile0_global
             self.tactile_1_global_xyz = self.global_force.tactile1_global
@@ -298,21 +324,36 @@ class GripperControl(Node):
                 self.get_logger().warn("Global tactile Y force threshold exceeded. Terminating cable pull")
                 break
 
-            self.slip_state = self.get_slip_status()
-            self.tactile_0_slipstate = self.slip_state.tactile0_slip
-            self.tactile_1_slipstate = self.slip_state.tactile1_slip
+            # Get current data for slope calculation and add to lists
+            stepper_pos.append(self.cable_pull_jig_state.stepper_position)
+            global_y_tactile_0.append(self.tactile_0_global_xyz[1])
+            global_y_tactile_1.append(self.tactile_1_global_xyz[1])
 
-            # # If slip is detected, increase grip current
-            # if self.grip_current > max_grip:
-            #     self.get_logger().warn('max grip reached')
-            #     break
+            current_slope_0 = self.slip_check(stepper_pos, global_y_tactile_0)
+            current_slope_1 = self.slip_check(stepper_pos, global_y_tactile_1)
 
-            if any(slip_num == 3 for slip_num in self.tactile_0_slipstate) or any(slip_num == 3 for slip_num in self.tactile_1_slipstate):
-                self.grip_current += self.grip_force_increment
-                self.get_logger().info(f"Slip detected [New Current Goal: {self.grip_current}]")
-                self.send_motor_request(CURRENT_BASED_POSITION_MODE, self.grip_current, FULLY_CLOSED_POS_CB) 
+            # NEW SLIP DETECTION
+            if current_slope_0 is not None and current_slope_1 is not None:
+                # If current slope is greater than the slip_slop -> increase grip
+                if np.abs(current_slope_0) > self.preset_slope or np.abs(current_slope_1) > self.preset_slope:
+                    self.grip_current += self.grip_force_increment
+                    self.get_logger().info(f"Slip detected [New Current Goal: {self.grip_current}]")
+                    self.send_motor_request(CURRENT_BASED_POSITION_MODE, self.grip_current, FULLY_CLOSED_POS_CB) 
+
+            # Safety grip force check
+            if self.grip_current > self.grip_max:
+                self.get_logger().warn('max grip reached')
+                break
+
+            # self.slip_state = self.get_slip_status()
+            # self.tactile_0_slipstate = self.slip_state.tactile0_slip
+            # self.tactile_1_slipstate = self.slip_state.tactile1_slip
             
-            self.cable_state = self.get_cable_status()
+            # If slip is detected, increase grip current
+            # if any(slip_num == 3 for slip_num in self.tactile_0_slipstate) or any(slip_num == 3 for slip_num in self.tactile_1_slipstate):
+            #     self.grip_current += self.grip_force_increment
+            #     self.get_logger().info(f"Slip detected [New Current Goal: {self.grip_current}]")
+            #     self.send_motor_request(CURRENT_BASED_POSITION_MODE, self.grip_current, FULLY_CLOSED_POS_CB) 
 
         if self.global_y_exceeded or self.global_z_exceeded:
             # Stop slip detection controller
@@ -337,8 +378,8 @@ class GripperControl(Node):
             self.get_logger().info("Returning home")
             self.send_linear_actuator_request(3)
 
-            while self.cable_state.cable_state == 0:
-                self.cable_state = self.get_cable_status()
+            while self.cable_pull_jig_state.cable_state == 0:
+                self.cable_pull_jig_state = self.get_cable_pull_jig_status()
 
             self.get_logger().info("Cable reseated")
             
@@ -370,10 +411,7 @@ def main(args=None):
 
     gripper_control.run(filename)    
 
-    # Use a MultiThreadedExecutor to enable processing goals concurrently
-    executor = MultiThreadedExecutor()
-    rclpy.spin(gripper_control, executor=executor)
-    # rclpy.spin(gripper_control)
+    rclpy.spin(gripper_control)
 
     # Shutdown everything cleanly
     rclpy.shutdown()

@@ -21,7 +21,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/RecordData.action"
   "srv/LinearActuator.srv"
   "msg/CableState.msg"
-  "srv/CableState.srv"
+  "srv/CablePullJigState.srv"
   "srv/TactileSlip.srv"
   "srv/TactileGlobal.srv"
 )
