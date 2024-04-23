@@ -56,14 +56,22 @@ class LinearActuatorControl(Node):
             cable_pull_jig_status = self.arduino.read(size=self.arduino.in_waiting).strip().split(b'\r\n')
 
             # Append the latest two readings and pop the rest - helps catch and missreadings
-            self.jig_status_list.extend(cable_pull_jig_status[-2:])
-            if len(self.jig_status_list) > 2:
+            self.jig_status_list.append(cable_pull_jig_status)
+            if len(self.jig_status_list) >= 3:
                 self.jig_status_list = self.jig_status_list[-2:]
-            
-            # cable_status_coded, current_stepper_pos_coded = cable_pull_jig_status[-4].decode().split(',')
-            cable_status_coded, current_stepper_pos_coded = self.jig_status_list[0].decode().split(',')
-            self.cable_state = int(cable_status_coded)
-            self.current_stepper_pos = int(current_stepper_pos_coded)
+
+            try:
+                jig_status = self.jig_status_list[0]
+                cable_status_coded, current_stepper_pos_coded = jig_status[-2].decode().split(',')
+                self.cable_state = int(cable_status_coded)
+                self.current_stepper_pos = int(current_stepper_pos_coded)
+                print(self.cable_state)
+            except IndexError:
+                jig_status = self.jig_status_list[1]
+                cable_status_coded, current_stepper_pos_coded = jig_status[-2].decode().split(',')
+                self.cable_state = int(cable_status_coded)
+                self.current_stepper_pos = int(current_stepper_pos_coded)
+                print(self.cable_state)
 
             self.cable_status_pub_callback()
             self.stepper_pos_pub_callback()

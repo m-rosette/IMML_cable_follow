@@ -35,6 +35,8 @@ class GroundTruther:
         self.gripper_right_column = data_set_info["gripper_right_column"]
         self.gripper_left_column = data_set_info["gripper_left_column"]
         self.gripper_bottom_row = data_set_info["gripper_bottom_row"]
+        self.top_range = data_set_info['top_range']
+        self.bottom_range = data_set_info['bottom_range']
 
         self.viz = viz
         self.overwrite = overwrite
@@ -288,15 +290,17 @@ class GroundTruther:
         gripper_left_column = self.gripper_left_column
         gripper_right_column = self.gripper_right_column
 
+        top_range = self.top_range
+        bottom_range = self.bottom_range
 
         try:
             while len(right_side_masked_rows) < 1:
-                right_column_rows = np.where(red_mask[:, gripper_right_column] > 0)[0]
+                right_column_rows = np.where(red_mask[top_range:bottom_range, gripper_right_column] > 0)[0]
                 right_side_masked_rows += list(right_column_rows)
                 gripper_right_column += 1
 
             while len(left_side_masked_rows) < 1:
-                left_column_rows = np.where(red_mask[:, gripper_left_column] > 0)[0]
+                left_column_rows = np.where(red_mask[top_range:bottom_range, gripper_left_column] > 0)[0]
                 left_side_masked_rows += list(left_column_rows)
                 gripper_left_column -= 1
         except IndexError as e:
@@ -490,5 +494,5 @@ def setup_train_and_val_data():
 
 
 if __name__ == "__main__":
-    # get_ground_truth_data()
+    get_ground_truth_data()
     setup_train_and_val_data()

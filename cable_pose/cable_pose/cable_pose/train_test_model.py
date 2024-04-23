@@ -4,7 +4,7 @@ import tensorflow as tf
 from keras.models import Sequential
 # from tensorflow.keras.layers import LSTM, Dense, Dropout
 from keras.layers import LSTM, Dense, Dropout
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, TensorBoard
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -99,17 +99,34 @@ evaluate_with_metric (bool): If True, the evaluation metric will be run each epo
     # First LSTM layer
     model.add(LSTM(units=dataset_info["num_units"],
                    activation=dataset_info["activation_function"],
+                #    recurrent_activation='relu',
                    input_shape=(dataset_info["time_steps_to_use"], dataset_info["num_features"]),
                    # return_sequences=False,
-                   # recurrent_dropout=0.2
+                #    recurrent_dropout=0.1
+                #    dropout=0.1,
+                   go_backwards=True,
+                #    unroll=True,
                    ))
 
-    model.add(Dense(3))
+    model.add(Dense(3, use_bias=False))
 
-    optimizer = keras.optimizers.Adam()
-    loss_func = keras.losses.MeanAbsoluteError()
+    lr_schedule = keras.optimizers.schedules.ExponentialDecay(
+                                initial_learning_rate=0.001,
+                                decay_steps=1000,
+                                decay_rate=0.9)
+
+    optimizer = keras.optimizers.Adam(learning_rate=lr_schedule)
+    # optimizer_wrapped = keras.optimizers.LossScaleOptimizer(optimizer)
+
+    # loss_func = keras.losses.MeanAbsoluteError() # L1
+    loss_func = keras.losses.MeanSquaredError() # L2
+
     model.compile(optimizer=optimizer, loss=loss_func)
     # model.compile(optimizer=dataset_info["optimizer"], loss=dataset_info["loss_function"])
+
+    # Define TensorBoard callback
+    tensorboard_log_dir = os.path.join(data_save_directory, 'logs')
+    tensorboard_callback = TensorBoard(tensorboard_log_dir, histogram_freq=1)
 
     if evaluate_with_metric:
         custom_evaluation_callback = CustomEvaluationCallback(evaluation_data=(X_val, y_val), dataset_info=dataset_info,
@@ -120,7 +137,7 @@ evaluate_with_metric (bool): If True, the evaluation metric will be run each epo
                             epochs=dataset_info["num_epochs"],
                             validation_data=(X_val, y_val),
                             batch_size=dataset_info["batch_size"],
-                            callbacks=[custom_evaluation_callback]
+                            callbacks=[custom_evaluation_callback, tensorboard_callback]
                             )
     else:
         history = model.fit(X_train,
@@ -128,6 +145,7 @@ evaluate_with_metric (bool): If True, the evaluation metric will be run each epo
                             epochs=dataset_info["num_epochs"],
                             validation_data=(X_val, y_val),
                             batch_size=dataset_info["batch_size"],
+                            callbacks=[tensorboard_callback]
                             )
 
     # Plot accuracy from training history
@@ -271,7 +289,8 @@ def run_trial(note=None):
     dataset_info = get_dataset_info()
     trials_directory = dataset_info["trials_directory"]
     # get the current trial number
-    trial_number = len(os.listdir(trials_directory)) - 2
+    # trial_number = len(os.listdir(trials_directory)) - 2
+    trial_number = len(os.listdir(trials_directory))
 
     # create the trial directory
     trial_directory = os.path.join(trials_directory, str(trial_number))
@@ -309,20 +328,20 @@ def run_trial(note=None):
     average_angle_error = sum(average_angle_errors) / len(average_angle_errors)
     num_radius_corrections = sum(num_radius_corrections_list) / len(num_radius_corrections_list)
 
-    # save a copy of the code used
-    code_directory = os.path.join(trial_directory, "code")
-    os.mkdir(code_directory)
-    file_names = ["dataset_info.py", "process_data.py", "process_results.py", "train_test_model.py", "../model_data/scaler.pkl"]
-    package_directory = dataset_info["package_directory"]
-    for file_name in file_names:
-        file_name = os.path.join(package_directory, "src", file_name)
-        os.system("cp {} {}".format(file_name, code_directory))
+    # # save a copy of the code used
+    # code_directory = os.path.join(trial_directory, "code")
+    # os.mkdir(code_directory)
+    # file_names = ["dataset_info.py", "process_data.py", "process_results.py", "train_test_model.py", "../model_data/scaler.pkl"]
+    # package_directory = dataset_info["package_directory"]
+    # for file_name in file_names:
+    #     file_name = os.path.join(package_directory, "src", file_name)
+    #     os.system("cp {} {}".format(file_name, code_directory))
 
     results_path = os.path.join(trials_directory, "all_results.csv")
 
     data_to_add = {"trial_number": [trial_number],
                    "average_distance_error": [average_distance_error],
-                   "distance_errors": [average_distance_errors],
+                #    "distance_errors": [average_distance_errors],
                    "average_angle_error": [average_angle_error],
                    "num_trials": [dataset_info["num_testing_trials"]],
                    "num_epochs": [dataset_info["num_epochs"]],
@@ -369,11 +388,8 @@ def run_trial(note=None):
     with open(os.path.join(trials_directory, "notes", "note_{}.txt".format(trial_number)), "w") as f:
         f.write(note)
 
-    print("Average distance errors: {}".format(average_distance_errors))
+    # print("Average distance errors: {}".format(average_distance_errors))
     print("Average distance error: {}".format(average_distance_error))
-
-
-
 
 
 if __name__ == "__main__":
@@ -381,13 +397,8 @@ if __name__ == "__main__":
     # dataset_info = get_dataset_info()
     # model = keras.models.load_model(dataset_info["model_path"])
 
-    note = "first test"
+    note = "gloved - wider color detection - ommitted 3 trials"
     run_trial(note)
 
-    # model = train_model(dataset_info=get_dataset_info(), data_save_directory="/home/jostan/Documents/trials1", evaluate_with_metric=True)
-
-
-    # image_save_directory = "/home/jostan/Documents/trials1/images"
-    # test_model(image_save_directory=image_save_directory, verbose=True)
 
 

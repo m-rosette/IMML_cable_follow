@@ -20,6 +20,8 @@ class PlotPapillarrayForce:
 
         self.pillar_force = np.zeros((self.num_arrays, self.num_pillars, self.data.shape[0], self.num_dim))
         self.global_force = np.zeros((self.num_arrays, self.data.shape[0], self.num_global))
+        self.grip_force = np.zeros((self.data.shape[0], 1))
+        self.stepper_pos = np.zeros((self.data.shape[0], 1))
 
     def load_data(self, csv_file):
         return pd.read_csv(csv_file)
@@ -128,26 +130,45 @@ class PlotPapillarrayForce:
         plt.tight_layout()
         plt.show()
 
-    def plot_cable_pull(self):
+    def plot_cable_pull(self, grip_or_step='grip'):
         # self.timestamp = np.squeeze(self.timestamp)
         self.get_global_force_data()
 
         # Get gripper variables
         cable_status = self.extract_columns(header_starts_with=('cable_status'))
-        grip_force = self.extract_columns(header_starts_with=('gripper_current'))
+        self.grip_force = self.extract_columns(header_starts_with=('gripper_current'))
+        self.stepper_pos = self.extract_columns(header_starts_with=('stepper_pos'))
+
+        # res = [i for i in range(len(stepper_pos)) if stepper_pos[i] is None]
+ 
+        # # print result
+        # print("The None indices list is : " + str(res))
+
+        # print(stepper_pos)
 
         # Convert NaN values to zero
         # cable_status = np.nan_to_num(cable_status, nan=1)
-        grip_force = np.nan_to_num(grip_force)
+        self.grip_force = np.nan_to_num(self.grip_force)
+        self.stepper_pos = np.nan_to_num(self.stepper_pos)
 
         fig, ax1 = plt.subplots()
 
-        # Plot grip_force on the right y-axis
-        color = 'tab:red'
-        ax1.set_xlabel('Time')
-        ax1.set_ylabel('Grip Force', color=color)
-        ax1.plot(self.timestamp, grip_force, color=color, label='Grip Force', linestyle=':', linewidth=3)
-        ax1.tick_params(axis='y', labelcolor=color)
+        if grip_or_step == 'grip':
+            # Plot grip_force on the right y-axis
+            color = 'tab:red'
+            ax1.set_xlabel('Time')
+            ax1.set_ylabel('Grip Force', color=color)
+            ax1.plot(self.timestamp, self.grip_force, color=color, label='Grip Force', linestyle=':', linewidth=3)
+            ax1.tick_params(axis='y', labelcolor=color)
+            cable_shade_scale = [np.min(self.grip_force), np.max(self.grip_force)]
+        if grip_or_step == 'step':
+            # Plot grip_force on the right y-axis
+            color = 'tab:red'
+            ax1.set_xlabel('Time')
+            ax1.set_ylabel('Stepper Position', color=color)
+            ax1.plot(self.timestamp, self.stepper_pos, color=color, label='Stepper Position', linestyle=':', linewidth=3)
+            ax1.tick_params(axis='y', labelcolor=color) 
+            cable_shade_scale = [np.min(self.stepper_pos), np.max(self.stepper_pos)]
 
         # Create a second y-axis for global force
         ax2 = ax1.twinx()
@@ -166,8 +187,8 @@ class PlotPapillarrayForce:
         ax2.tick_params(axis='y', labelcolor='tab:blue')
 
         # Fill between cable status 0 and 1
-        ax1.fill_between(np.squeeze(self.timestamp), np.min(grip_force)-self.add_plot_region_bound, np.max(grip_force)+self.add_plot_region_bound, where=(np.squeeze(cable_status) == 0), color='darkgrey', alpha=0.5) #, label='Cable Status 0')
-        ax1.fill_between(np.squeeze(self.timestamp), np.min(grip_force)-self.add_plot_region_bound, np.max(grip_force)+self.add_plot_region_bound, where=(np.squeeze(cable_status) == 1), color='lightgrey', alpha=0.5) #, label='Cable Status 1')
+        ax1.fill_between(np.squeeze(self.timestamp), cable_shade_scale[0]-self.add_plot_region_bound, cable_shade_scale[1]+self.add_plot_region_bound, where=(np.squeeze(cable_status) == 0), color='darkgrey', alpha=0.5) #, label='Cable Status 0')
+        ax1.fill_between(np.squeeze(self.timestamp), cable_shade_scale[0]-self.add_plot_region_bound, cable_shade_scale[1]+self.add_plot_region_bound, where=(np.squeeze(cable_status) == 1), color='lightgrey', alpha=0.5) #, label='Cable Status 1')
 
         try:
             # Find the indices where cable status is 0
@@ -176,9 +197,9 @@ class PlotPapillarrayForce:
             xmax_status_0 = self.timestamp[cable_status_0_indices[-1]]
 
             # Position the text box within the shaded regions
-            ax1.text((xmin_status_0 + xmax_status_0) / 2, np.min(grip_force)-self.add_plot_region_bound, "Cable Unseated", horizontalalignment='center', verticalalignment='bottom')
-            ax1.text((self.timestamp[0] + xmin_status_0) / 2, np.min(grip_force)-self.add_plot_region_bound, 'Cable Seated', horizontalalignment='center', verticalalignment='bottom')
-            ax1.text((self.timestamp[-1] + xmax_status_0) / 2, np.min(grip_force)-self.add_plot_region_bound, 'Cable Seated', horizontalalignment='center', verticalalignment='bottom')
+            ax1.text((xmin_status_0 + xmax_status_0) / 2, cable_shade_scale[0]-self.add_plot_region_bound, "Cable Unseated", horizontalalignment='center', verticalalignment='bottom')
+            ax1.text((self.timestamp[0] + xmin_status_0) / 2, cable_shade_scale[0]-self.add_plot_region_bound, 'Cable Seated', horizontalalignment='center', verticalalignment='bottom')
+            ax1.text((self.timestamp[-1] + xmax_status_0) / 2, cable_shade_scale[0]-self.add_plot_region_bound, 'Cable Seated', horizontalalignment='center', verticalalignment='bottom')
         
         except IndexError:
             pass
@@ -190,16 +211,57 @@ class PlotPapillarrayForce:
 
         plt.show()
 
+    def plot_slip_slope(self):
+        self.get_global_force_data()
+        self.stepper_pos = np.squeeze(self.extract_columns(header_starts_with=('stepper_pos')))
+
+        stepper_diff = np.diff(self.stepper_pos)[:250]
+        global_y_0_diff = np.diff(self.global_force[0, :, 1])[:250]
+        # print(stepper_diff.shape)
+
+        # Reshape the array into a 2D array with 5 columns
+        stepper_diff_reshape = stepper_diff.reshape(-1, 5)
+        global_y_0_diff_reshape = global_y_0_diff.reshape(-1, 5)
+
+        stepper_diff_avg = np.mean(stepper_diff_reshape, axis=1)
+        global_y_0_diff_avg = np.mean(global_y_0_diff_reshape, axis=1)
+
+        slopes = []
+        for i, step_diff in enumerate(stepper_diff_avg):
+            # If no slope differences resulted in 0
+            if step_diff != 0:
+                # Calculate slope (change in value / change in time)
+                slopes.append(global_y_0_diff_avg[i] / step_diff)
+
+        print(slopes)
+
+        plt.plot(slopes)
+        plt.show()
+
+    def plot_slope(self):
+        self.get_global_force_data()
+        self.stepper_pos = np.squeeze(self.extract_columns(header_starts_with=('stepper_pos')))
+        self.stepper_pos = np.nan_to_num(self.stepper_pos)
+
+        # print(self.global_force[0, :, 1])
+        # print(self.stepper_pos)
+
+        plt.plot(self.stepper_pos, self.global_force[0, :, 1])
+        plt.show()
+
 
 if __name__ == '__main__':
     # name = 'test_failed_unseated_middle'
     # name = 'test_failed_unseated_top'
     # name = 'global_y_3pt5_exceeded_bottom'
     # name = 'global_z_6pt0_exceeded_bottom'
-    name = 'what6'
+    # name = 'new_stepper'
+    name = '4'
 
     filename = f'/home/marcus/IMML/ros2_ws/src/IMML_cable_follow/trial_control/trial_control/resource/{name}.csv'    
     pltforce = PlotPapillarrayForce(filename)
 
     # pltforce.plot_xyz_force()
-    pltforce.plot_cable_pull()
+    pltforce.plot_cable_pull('grip')
+    # pltforce.plot_slip_slope()
+    # pltforce.plot_slope()

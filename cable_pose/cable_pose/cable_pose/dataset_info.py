@@ -13,21 +13,30 @@ def get_dataset_info():
     # put all the dataset info in a dictionary
     dataset_info = {}
 
-    num_pillars = 8
+    num_trials = 80
+    num_samples_per_trial = 10
 
     # are you using the gloved or gloveless dataset?
-    gloved = False
-
+    gloved = True
 
     if gloved:
-       dataset_directory = '/home/marcus/IMML/ros2_ws/data/gloved/'
-       skip_trials = []
+        dataset_directory = '/home/marcus/IMML/ros2_ws/data/gloved/'
+        skip_trials = [6, 30, 33]
+        # 6_3, 30_3 seems to have taken an image while open...
+        # 30_9, 33_9 seems to have grabbed a shadow...?
+        num_pillars = 9
+        num_features = 155
     else:
         dataset_directory = '/home/marcus/IMML/ros2_ws/data/gloveless/'
         # Trials numbers to not use for training, mostly because they don't have valid entry/exit points
-        skip_trials = [52, 53, 54, 55, 56, 57, 58, 59, 61, 67, 68, 69, 78]
+        # skip_trials = []
+        # skip_trials = list(range(0, 51)) + list(range(73, num_trials)) # [0:50, 73:]
+        # skip_trials = [52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 65, 67, 68, 69, 72, 78]
+        skip_trials = [68, 69, 72, 78]
         # 52-61 catches a shadow at the bottom of gripper (can you crop that?)
         # maybe 60, 65, 72 (1 outlier)
+        num_pillars = 8
+        num_features = 139
 
     package_directory = '/home/marcus/IMML/ros2_ws/src/IMML_cable_follow/cable_pose/'
 
@@ -41,8 +50,8 @@ def get_dataset_info():
 
     dataset_info["enter_exit_multiplier"] = 10
     dataset_info["time_steps_to_use"] = 50
-    dataset_info["num_epochs"] = 200
-    dataset_info["batch_size"] = 10
+    dataset_info["num_epochs"] = 500
+    dataset_info["batch_size"] = 20
     dataset_info["model_version"] = 1
     dataset_info["num_testing_trials"] = 1
     dataset_info["activation_function"] = "relu"
@@ -50,9 +59,6 @@ def get_dataset_info():
     dataset_info["optimizer"] = "adam"
     dataset_info["num_units"] = 50
 
-    num_trials = 80
-    num_samples_per_trial = 10
-    num_features = 139
 
     # Set features to not use here
     non_feature_columns2 = ['0_slipstate_{}'.format(i) for i in range(num_pillars)]
@@ -131,11 +137,15 @@ def get_dataset_info():
     dataset_info["bottom_crop"] = 100
     dataset_info["top_crop"] = 50
     # Columns and rows of the image that are the left, right and bottom of the gripper, used for enter/exit point calculation
-    dataset_info["gripper_right_column"] = 355
-    dataset_info["gripper_left_column"] = 240
+    # dataset_info["gripper_right_column"] = 355 # Gloveless
+    dataset_info["gripper_right_column"] = 365 # Gloved
+    # dataset_info["gripper_left_column"] = 240 # Gloveless
+    dataset_info["gripper_left_column"] = 230 # Gloved
     dataset_info["gripper_bottom_row"] = 450
     dataset_info["pixels_per_mm"] = 4.05
     dataset_info["gripper_center_row"] = 348 #375
+    dataset_info['top_range'] = 0
+    dataset_info['bottom_range'] = 425
 
     # Seed to use to keep consistent results, can be set to None to not set a seed
     dataset_info["random_seed"] = 42

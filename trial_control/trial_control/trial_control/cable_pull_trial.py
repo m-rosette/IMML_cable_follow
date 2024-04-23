@@ -59,9 +59,12 @@ class GripperControl(Node):
         # Initialize gripper variables
         self.grip_current = 18.0
         self.grip_force_increment = 2
-        self.grip_max = 65
+        self.grip_max = 70
         self.current_gripper_pos = None
-        # self.cable_pull_jig_state = None
+        self.cable_state_tactile = True
+        self.disconnection_factor = 0.6
+        self.tactile_0_global_y_prev = 0
+        self.tactile_1_global_y_prev = 0
         self.tactile_0_slipstate = []
         self.tactile_1_slipstate = []   
         self.tactile_0_global_xyz = []
@@ -73,7 +76,7 @@ class GripperControl(Node):
         self.global_y_exceeded = False    
 
         # Initialize sliding window slope variables
-        self.preset_slope = 0.0035    # Set your desired preset slope
+        self.preset_slope = 0.005    # Set your desired preset slope
         self.window_size = 10
         self.numerator_diff = []
         self.denominator_diff = []
@@ -294,9 +297,9 @@ class GripperControl(Node):
         self.send_motor_request(CURRENT_BASED_POSITION_MODE, self.grip_current, FULLY_CLOSED_POS_CB)  
         time.sleep(2)
 
-        # Start slip detection controller - Only once tactile sensors have initial contact
-        self.get_logger().info("Starting slip detection")
-        self.start_detection = self.start_slip_detection()
+        # # Start slip detection controller - Only once tactile sensors have initial contact
+        # self.get_logger().info("Starting slip detection")
+        # self.start_detection = self.start_slip_detection()
 
         # Start cable pull 
         self.get_logger().info("Beginning cable pull")
@@ -305,7 +308,8 @@ class GripperControl(Node):
         # Get the current cable state
         self.cable_pull_jig_state = self.get_cable_pull_jig_status()
 
-        while self.cable_pull_jig_state.cable_state == 1:
+        # while self.cable_pull_jig_state.cable_state == 1:
+        while self.cable_state_tactile:
             self.cable_pull_jig_state = self.get_cable_pull_jig_status()
 
             self.global_force = self.get_global_tactile_threshold_status()
@@ -344,6 +348,15 @@ class GripperControl(Node):
             if self.grip_current > self.grip_max:
                 self.get_logger().warn('max grip reached')
                 break
+            
+            # Check if there is cable disconnection
+            if np.abs(self.tactile_0_global_xyz[1]) < self.disconnection_factor * np.abs(self.tactile_0_global_y_prev) or np.abs(self.tactile_1_global_xyz[1]) < self.disconnection_factor * np.abs(self.tactile_1_global_y_prev):
+                self.cable_state_tactile = False
+                self.get_logger().warn("Cable disconnected")
+            
+            # Update the previous global readings
+            self.tactile_0_global_y_prev = self.tactile_0_global_xyz[1]
+            self.tactile_1_global_y_prev = self.tactile_1_global_xyz[1]
 
             # self.slip_state = self.get_slip_status()
             # self.tactile_0_slipstate = self.slip_state.tactile0_slip
@@ -356,9 +369,9 @@ class GripperControl(Node):
             #     self.send_motor_request(CURRENT_BASED_POSITION_MODE, self.grip_current, FULLY_CLOSED_POS_CB) 
 
         if self.global_y_exceeded or self.global_z_exceeded:
-            # Stop slip detection controller
-            self.get_logger().info("Stoping slip detection")
-            self.stop_detection = self.stop_slip_detection()
+            # # Stop slip detection controller
+            # self.get_logger().info("Stoping slip detection")
+            # self.stop_detection = self.stop_slip_detection()
 
             # Stop the linear actuator
             self.send_linear_actuator_request(4)
@@ -371,9 +384,9 @@ class GripperControl(Node):
             self.get_logger().info("Cable unseated")
             time.sleep(1)
 
-            # Stop slip detection controller
-            self.get_logger().info("Stoping slip detection")
-            self.stop_detection = self.stop_slip_detection()
+            # # Stop slip detection controller
+            # self.get_logger().info("Stoping slip detection")
+            # self.stop_detection = self.stop_slip_detection()
 
             self.get_logger().info("Returning home")
             self.send_linear_actuator_request(3)
@@ -409,7 +422,7 @@ def main(args=None):
             rclpy.shutdown()
             return 
 
-    gripper_control.run(filename)    
+    gripper_control.run(filename)   
 
     rclpy.spin(gripper_control)
 
