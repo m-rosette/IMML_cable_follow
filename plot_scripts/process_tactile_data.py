@@ -3,6 +3,7 @@
 import pandas as pd
 import numpy as np
 import os
+import glob
 import matplotlib.pyplot as plt
 
 
@@ -13,25 +14,29 @@ class PlotPapillarrayForce:
         self.num_dim = 3
         self.num_global = 6
         self.add_plot_region_bound = 5
+        self.num_pull_trials = 10
+        self.cutoff_index = 220
+        self.trial_data_shape = np.zeros((self.num_arrays, self.cutoff_index, self.num_global, self.num_pull_trials))
 
         self.data = self.load_data(filename)
-        self.timestamp = np.array(self.extract_columns(header_starts_with=('timestamp')))
+        self.timestamp = np.array(self.extract_columns(self.data, header_starts_with=('timestamp')))
         self.norm_time() # Convert from computer to trial time
 
         self.pillar_force = np.zeros((self.num_arrays, self.num_pillars, self.data.shape[0], self.num_dim))
-        self.global_force = np.zeros((self.num_arrays, self.data.shape[0], self.num_global))
+        # self.global_force = np.zeros((self.num_arrays, self.data.shape[0], self.num_global))
+        self.global_force = np.zeros((self.num_arrays, self.cutoff_index, self.num_global))
         self.grip_force = np.zeros((self.data.shape[0], 1))
         self.stepper_pos = np.zeros((self.data.shape[0], 1))
 
     def load_data(self, csv_file):
         return pd.read_csv(csv_file)
 
-    def extract_columns(self, header_starts_with=('0_fX', '0_fY', '0_fZ')):
+    def extract_columns(self, data, header_starts_with=('0_fX', '0_fY', '0_fZ')):
         # Convert all column names to strings and then filter columns
-        filtered_columns = [col for col in map(str, self.data.columns) if col.startswith(header_starts_with)]
+        filtered_columns = [col for col in map(str, data.columns) if col.startswith(header_starts_with)]
 
         # Extract the filtered columns
-        extracted_data = self.data[filtered_columns]
+        extracted_data = data[filtered_columns]
 
         return extracted_data
 
@@ -39,16 +44,16 @@ class PlotPapillarrayForce:
         init_time = self.timestamp[0]
         self.timestamp = self.timestamp - init_time
 
-    def get_force_data(self):
+    def get_force_data(self, data):
         for array in range(self.num_arrays):
             for pillar in range(self.num_pillars):
                 column_search = (f'{array}_fX_{pillar}', f'{array}_fY_{pillar}', f'{array}_fZ_{pillar}')
-                self.pillar_force[array, pillar, :, :] = self.extract_columns(column_search)
+                self.pillar_force[array, pillar, :, :] = self.extract_columns(data, column_search)
     
-    def get_global_force_data(self):
+    def get_global_force_data(self, data):
         for array in range(self.num_arrays):
             column_search = (f'{array}_gfx', f'{array}_gfy', f'{array}_gfz', f'{array}_gtx', f'{array}_gty', f'{array}_gtz')
-            self.global_force[array, :, :] = self.extract_columns(column_search)
+            self.global_force[array, :, :] = self.extract_columns(data, column_search)
     
     def rearrange_force(self, data):
         # 6=0, 7=1, 8=2
@@ -58,6 +63,18 @@ class PlotPapillarrayForce:
         force_data_copy[1, [8, 2], :, :] = force_data_copy[1, [2, 8], :, :]
         return force_data_copy
     
+    def get_trial_data(self, trial_dir, filename_prefix):
+        filepath = [os.path.join(trial_dir, filename) for filename in os.listdir(trial_dir) if filename.startswith(filename_prefix)]
+
+        data = self.trial_data_shape.copy()
+
+        for i, file in enumerate(filepath):
+            trial_data = self.load_data(file)
+            self.get_global_force_data(trial_data.iloc[:self.cutoff_index, :])
+            data[:, :, :, i] = self.global_force
+
+        return data
+
     def plot_force(self, force, ax=None):
         if ax is None:
             fig, axs = plt.subplots(1, self.num_arrays, figsize=(8 * self.num_arrays, 6), sharex=True)
@@ -87,8 +104,8 @@ class PlotPapillarrayForce:
 
     def plot_xyz_force(self):
         # self.timestamp = np.squeeze(self.timestamp)
-        force = self.get_force_data()
-        force = self.rearrange_force(force)
+        self.get_force_data()
+        force = self.rearrange_force(self.pillar_force)
 
         # Assuming 'force' contains x, y, z values for each subplot
         num_rows = 3
@@ -130,14 +147,14 @@ class PlotPapillarrayForce:
         plt.tight_layout()
         plt.show()
 
-    def plot_cable_pull(self, grip_or_step='grip'):
+    def plot_single_cable_pull(self, grip_or_step='grip'):
         # self.timestamp = np.squeeze(self.timestamp)
-        self.get_global_force_data()
+        self.get_global_force_data(self.data)
 
         # Get gripper variables
-        cable_status = self.extract_columns(header_starts_with=('cable_status'))
-        self.grip_force = self.extract_columns(header_starts_with=('gripper_current'))
-        self.stepper_pos = self.extract_columns(header_starts_with=('stepper_pos'))
+        cable_status = self.extract_columns(self.data, header_starts_with=('cable_status'))
+        self.grip_force = self.extract_columns(self.data, header_starts_with=('gripper_current'))
+        self.stepper_pos = self.extract_columns(self.data, header_starts_with=('stepper_pos'))
 
         # res = [i for i in range(len(stepper_pos)) if stepper_pos[i] is None]
  
@@ -248,20 +265,59 @@ class PlotPapillarrayForce:
 
         plt.plot(self.stepper_pos, self.global_force[0, :, 1])
         plt.show()
+        
+    def plot_pass_fail_trials(self):
+        timestamp = np.squeeze(self.timestamp)[:self.cutoff_index]
+
+        trial_directory = '/home/marcus/IMML/ros2_ws/src/IMML_cable_follow/trial_control/trial_control/resource/'
+
+        # Get all passed trials
+        large_pass = self.get_trial_data(trial_directory, 'large_pass')
+        medium_pass = self.get_trial_data(trial_directory, 'med_pass')
+        
+        # Get all failed trials
+        medium_fail = self.get_trial_data(trial_directory, 'med_fail')
+        small_fail = self.get_trial_data(trial_directory, 'small_fail')
+
+        # Create empty plots with labels for each color
+        plt.plot([], [], color='orange', label='Large Pass')
+        plt.plot([], [], color='red', label='Small Fail')
+        plt.plot([], [], color='green', label='Medium Pass')
+        plt.plot([], [], color='blue', label='Medium Fail')
+
+        # Start with all 10 trials (all passes or all fails)
+        for trial in range(self.num_pull_trials):
+            # Plot from the first array
+            plt.plot(timestamp, large_pass[0, :, 1, trial], color='orange')
+            plt.plot(timestamp, small_fail[0, :, 1, trial], color='red')
+
+            # Plot from the second array
+            plt.plot(timestamp, large_pass[1, :, 1, trial], color='orange')
+            plt.plot(timestamp, small_fail[1, :, 1, trial], color='red')
+
+        # There are 5/5 pass/fail of the medium magnet
+        for trial in range(5):
+            # Plot from the first array
+            plt.plot(timestamp, medium_pass[0, :, 1, trial], color='green')
+            plt.plot(timestamp, medium_fail[0, :, 1, trial], color='blue')
+
+            # Plot from the second array
+            plt.plot(timestamp, medium_pass[1, :, 1, trial], color='green')
+            plt.plot(timestamp, medium_fail[1, :, 1, trial], color='blue')
+        
+        # Plot the max y global force
+        plt.plot(timestamp, [4.0] * self.cutoff_index, linestyle='--', color='black', label='Force Threshold')
+        plt.plot(timestamp, [-4.0] * self.cutoff_index, linestyle='--', color='black')
+        
+        plt.legend()
+        plt.show()
 
 
 if __name__ == '__main__':
-    # name = 'test_failed_unseated_middle'
-    # name = 'test_failed_unseated_top'
-    # name = 'global_y_3pt5_exceeded_bottom'
-    # name = 'global_z_6pt0_exceeded_bottom'
-    # name = 'new_stepper'
-    name = '4'
+    name = 'big_grip'
 
     filename = f'/home/marcus/IMML/ros2_ws/src/IMML_cable_follow/trial_control/trial_control/resource/{name}.csv'    
     pltforce = PlotPapillarrayForce(filename)
 
-    # pltforce.plot_xyz_force()
-    pltforce.plot_cable_pull('grip')
-    # pltforce.plot_slip_slope()
-    # pltforce.plot_slope()
+    pltforce.plot_pass_fail_trials()
+    # pltforce.plot_single_cable_pull('grip')

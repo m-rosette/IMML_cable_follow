@@ -70,8 +70,8 @@ class GripperControl(Node):
         self.tactile_0_global_xyz = []
         self.tactile_1_global_xyz = []
         self.declare_parameter("global_x_max", 4.0)   
-        self.declare_parameter("global_y_max", 5.0)   
-        self.declare_parameter("global_z_max", 7.0)  
+        self.declare_parameter("global_y_max", 4.0)   
+        self.declare_parameter("global_z_max", 9.0)  
         self.global_z_exceeded = False
         self.global_y_exceeded = False    
 
@@ -295,7 +295,7 @@ class GripperControl(Node):
         # Close the gripper
         self.get_logger().info("Closing gripper")
         self.send_motor_request(CURRENT_BASED_POSITION_MODE, self.grip_current, FULLY_CLOSED_POS_CB)  
-        time.sleep(2)
+        time.sleep(3)
 
         # # Start slip detection controller - Only once tactile sensors have initial contact
         # self.get_logger().info("Starting slip detection")
@@ -352,6 +352,7 @@ class GripperControl(Node):
             # Check if there is cable disconnection
             if np.abs(self.tactile_0_global_xyz[1]) < self.disconnection_factor * np.abs(self.tactile_0_global_y_prev) or np.abs(self.tactile_1_global_xyz[1]) < self.disconnection_factor * np.abs(self.tactile_1_global_y_prev):
                 self.cable_state_tactile = False
+                self.get_logger().error("ahhhhh")
                 self.get_logger().warn("Cable disconnected")
             
             # Update the previous global readings
@@ -424,7 +425,10 @@ def main(args=None):
 
     gripper_control.run(filename)   
 
-    rclpy.spin(gripper_control)
+    # Use a MultiThreadedExecutor to enable processing goals concurrently
+    executor = MultiThreadedExecutor()
+    rclpy.spin(gripper_control, executor=executor)
+    # rclpy.spin(gripper_control)
 
     # Shutdown everything cleanly
     rclpy.shutdown()
