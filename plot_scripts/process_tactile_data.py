@@ -5,6 +5,7 @@ import numpy as np
 import os
 import glob
 import matplotlib.pyplot as plt
+import textwrap
 
 
 class PlotPapillarrayForce:
@@ -295,15 +296,15 @@ class PlotPapillarrayForce:
             plt.plot(timestamp, large_pass[1, :, 1, trial], color='orange')
             plt.plot(timestamp, small_fail[1, :, 1, trial], color='red')
 
-        # There are 5/5 pass/fail of the medium magnet
-        for trial in range(5):
-            # Plot from the first array
-            plt.plot(timestamp, medium_pass[0, :, 1, trial], color='green')
-            plt.plot(timestamp, medium_fail[0, :, 1, trial], color='blue')
+        # # There are 5/5 pass/fail of the medium magnet
+        # for trial in range(5):
+        #     # Plot from the first array
+        #     plt.plot(timestamp, medium_pass[0, :, 1, trial], color='green')
+        #     plt.plot(timestamp, medium_fail[0, :, 1, trial], color='blue')
 
-            # Plot from the second array
-            plt.plot(timestamp, medium_pass[1, :, 1, trial], color='green')
-            plt.plot(timestamp, medium_fail[1, :, 1, trial], color='blue')
+        #     # Plot from the second array
+        #     plt.plot(timestamp, medium_pass[1, :, 1, trial], color='green')
+        #     plt.plot(timestamp, medium_fail[1, :, 1, trial], color='blue')
         
         # Plot the max y global force
         plt.plot(timestamp, [4.0] * self.cutoff_index, linestyle='--', color='black', label='Force Threshold')
@@ -311,13 +312,114 @@ class PlotPapillarrayForce:
         
         plt.legend()
         plt.show()
+    
+    def imece_plot(self):
+        trial_directory = '/home/marcus/IMML/ros2_ws/src/IMML_cable_follow/trial_control/trial_control/resource/'
 
+        # Get and format timestamp
+        timestamp = np.squeeze(self.timestamp)[:self.cutoff_index]
+        start_time_idx = 59
+        end_time_idx_small = 150
+        small_time = timestamp[start_time_idx:end_time_idx_small]
+        # small_time = range(len(small_time))
+
+        # Get data for second subplot (small - failed)
+        small_fail = self.get_trial_data(trial_directory, 'small_fail')
+
+        # Get data for third subplot (large - passed)
+        large_pass = self.get_trial_data(trial_directory, 'large_pass')
+
+        # Initialize subplots
+        fig, (ax0, ax1, ax2) = plt.subplots(nrows=1, ncols=3, sharey=True, figsize=(18, 5))
+
+        # Set the scale for the y-axis
+        ax0.set_ylim(-5, 5)
+
+        ax0.plot(small_time, small_fail[0, start_time_idx:end_time_idx_small, 1, 9], color='blue')
+        ax0.plot(small_time, small_fail[1, start_time_idx:end_time_idx_small, 1, 9], color='cornflowerblue')
+
+        for trial in range(self.num_pull_trials):
+            # Plot large pass (cut off first 2 seconds)
+            ax2.plot(timestamp[start_time_idx:], large_pass[0, start_time_idx:, 1, trial], color='forestgreen')
+            ax2.plot(timestamp[start_time_idx:], large_pass[1, start_time_idx:, 1, trial], color='limegreen')
+
+            # Plot small fail (cut off first 2 seconds and anything after 8 seconds)
+            ax1.plot(small_time, small_fail[0, start_time_idx:end_time_idx_small, 1, trial], color='blue')
+            ax1.plot(small_time, small_fail[1, start_time_idx:end_time_idx_small, 1, trial], color='cornflowerblue')
+
+        # Plot the max y global force threshold on each subplot
+        ax0.plot(small_time, [4.0] * len(small_time), linestyle='--', color='black', label='Threshold')
+        ax0.plot(small_time, [-4.0] * len(small_time), linestyle='--', color='black')
+        ax1.plot(small_time, [4.0] * len(small_time), linestyle='--', color='black')
+        ax1.plot(small_time, [-4.0] * len(small_time), linestyle='--', color='black')
+        ax2.plot(timestamp[start_time_idx:], [4.0] * (self.cutoff_index - start_time_idx), linestyle='--', color='black')
+        ax2.plot(timestamp[start_time_idx:], [-4.0] * (self.cutoff_index - start_time_idx), linestyle='--', color='black')
+
+        # Plot shaded regions and text (first plot)
+        shade_height = 4
+
+        initial_grip = [start_time_idx, start_time_idx + 12]
+        initial_grip_center_x = np.sum(timestamp[initial_grip]) / 2
+        ax0.fill_between(timestamp[initial_grip[0]:initial_grip[1]], -shade_height, shade_height, color='gray', alpha=0.3)
+        ax0.text(initial_grip_center_x, -shade_height + 0.5, textwrap.fill("Initial Grasp", width=10), horizontalalignment='center', verticalalignment='bottom')
+
+        pull = [initial_grip[1] + 1, initial_grip[1] + 41]
+        pull_center_x = np.sum(timestamp[pull]) / 2
+        ax0.fill_between(timestamp[pull[0]:pull[1]], -shade_height, shade_height, color='gray', alpha=0.3)
+        ax0.text(pull_center_x, -shade_height + 0.7, textwrap.fill("Pulling", width=10), horizontalalignment='center', verticalalignment='bottom')
+
+        slip = [pull[1] + 1, pull[1] + 16]
+        slip_center_x = np.sum(timestamp[slip]) / 2
+        ax0.fill_between(timestamp[slip[0]:slip[1]], -shade_height, shade_height, color='gray', alpha=0.3)
+        ax0.text(slip_center_x, -shade_height + 0.7, textwrap.fill("Slipping", width=10), horizontalalignment='center', verticalalignment='bottom')
+
+        separated = [slip[1] + 1, end_time_idx_small]
+        separated_center_x = np.sum(timestamp[separated]) / 2
+        ax0.fill_between(timestamp[separated[0]:separated[1]], -shade_height, shade_height, color='gray', alpha=0.3)
+        ax0.text(separated_center_x, -shade_height + 0.7, textwrap.fill("Parted", width=10), horizontalalignment='center', verticalalignment='bottom')
+
+        # Text box identifying tactile arrays
+        ax0.text(5.25, shade_height + 0.70, 'Array 1', horizontalalignment='center', verticalalignment='top', fontsize=12)
+        ax0.text(5.25, -shade_height - 0.75, 'Array 0', horizontalalignment='center', verticalalignment='bottom', fontsize=12)
+        # ax0.text()
+
+        # Define the coordinate location for the legend
+        x_coord = 0.19  # x-coordinate
+        y_coord = 1  # y-coordinate
+
+        # Place the legend at the specified coordinate location
+        ax0.legend(loc='upper center', fancybox=True, ncol=1, bbox_to_anchor=(x_coord, y_coord))
+        # ax0.legend(loc='upper left')
+
+        # Plot titles
+        ax0.set_ylabel('Global Y Force (N)')
+        ax0.set_xlabel('Time (s)')
+        ax1.set_xlabel('Time (s)')
+        ax2.set_xlabel('Time (s)')
+        ax1.title.set_text("Fail")
+        ax2.title.set_text("Pass")
+
+        plt.show()
+
+    def lstm_learned_sum_error(self):
+        data = self.load_data('/home/marcus/IMML/ros2_ws/data/gloved/trials/3/stats_0.csv')
+        average_distance_error = self.extract_columns(data, header_starts_with=('average_distance_error'))
+
+        # Set the figure size
+        plt.figure(figsize=(5, 4))
+
+        plt.plot(average_distance_error, label="Average Distance Error")
+        plt.xlabel("Epochs", fontsize=12)
+        plt.ylabel("Distance Error (mm)", fontsize=12)
+        plt.show()
 
 if __name__ == '__main__':
-    name = 'big_grip'
+    name = 'small_fail_2'
 
     filename = f'/home/marcus/IMML/ros2_ws/src/IMML_cable_follow/trial_control/trial_control/resource/{name}.csv'    
     pltforce = PlotPapillarrayForce(filename)
 
-    pltforce.plot_pass_fail_trials()
+    # pltforce.plot_pass_fail_trials()
     # pltforce.plot_single_cable_pull('grip')
+    # pltforce.imece_plot()
+    pltforce.lstm_learned_sum_error()
