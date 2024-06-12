@@ -4,7 +4,7 @@
 <!-- Launch the UR Driver -->
 <include file="$(find ur_robot_driver)/launch/ur5e_bringup.launch">
   <!-- all vars that included.launch requires must be set -->
-  <arg name="kinematics_config" value="/root/ros_ws/src/trial_control/resources/cindys_ur5e_calibration.yaml" />
+  <arg name="kinematics_config" value="/root/catkin_ws/src/trial_control/resources/cindys_ur5e_calibration.yaml" />
   <arg name="robot_ip" value="$(arg ip)" />
 </include>
 

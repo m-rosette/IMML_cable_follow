@@ -1,0 +1,3 @@
+[submodule "lbc_project"]
+	path = lbc_project
+	url = https://github.com/Jostan86/lbc_project.git

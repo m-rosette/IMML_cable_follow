@@ -41,7 +41,8 @@ class CableTrace:
         self.arm_group.allow_replanning(1)  
 
         # Create action server
-        self.move_server = SimpleActionServer("move_server", MoveAction, execute_cb=self.mod_position_callback, auto_start=False)
+        self.move_server = SimpleActionServer("move_server", MoveAction, execute_cb=self.mod_position_callback, auto_start=False, cancel_callback=self.cancel_callback)
+        # self.move_server.register_cancel_callback(self.cancel_callback)
         self.move_server.start()
         rospy.loginfo("Move server up!")
     
@@ -83,12 +84,11 @@ class CableTrace:
         self.move_server.set_aborted()
 
 
-
+    def cancel_callback(self):
+      self.arm_group.stop()
+      self.move_server.set_aborted()
 
     def main(self):
-      
-
-
       rospy.spin()
 
 

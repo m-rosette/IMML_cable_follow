@@ -5,7 +5,7 @@ from trial_control.msg import MoveAction, MoveGoal, Movement, RecordGoal, Record
 from actionlib import SimpleActionClient
 from std_msgs.msg import String, Int16
 from lbc_project.srv import MoveData, MoveDataResponse
-from trial_control.srv import PictureTrigger, PictureTriggerResponse
+from trial_control.srv import PictureTrigger, PictureTriggerResponse, CablePullTrigger, CablePullTriggerResponse
 import os
 """
 1) Freedrive the robot to the the starting location on the cable
@@ -18,8 +18,6 @@ D) Get back the delta x, y, theta
 E) Call the move_arm action server
 
 """
-
-
 
 
 class CableTrace:
@@ -38,10 +36,12 @@ class CableTrace:
         self.record_ac.wait_for_server()
         rospy.loginfo("Recording server up!")
 
-
         rospy.wait_for_service('picture_trigger')
         rospy.loginfo("Picture service up, ready!")
         self.pic = rospy.ServiceProxy('picture_trigger', PictureTrigger)
+        
+        # Create the cable pull service server
+        self.cable_pull_service = rospy.Service('cable_pull_trigger', CablePullTrigger, self.handle_cable_pull_trigger)
 
         # Set up the gripper position/current publisher
         self.gripper_pos_pub = rospy.Publisher('Gripper_Cmd', String, queue_size=5)
@@ -49,6 +49,35 @@ class CableTrace:
         rospy.wait_for_service('gripper_move_data')
         rospy.loginfo("LSTM service up, ready!")
         self.lstm = rospy.ServiceProxy('gripper_move_data', MoveData)
+
+        # Create the cable pull action client
+        self.pull_action = SimpleActionClient("pull_server", PullAction)
+        rospy.loginfo("Waiting for pull action server to come up.")
+        self.pull_action.wait_for_server()
+        rospy.loginfo("Pull action server up!")
+
+    def handle_cable_pull_trigger(self, req):
+        rospy.loginfo("Cable pull service called")
+        
+        # Send goal to pull action server
+        pull_goal = PullGoal() # sending an empty goal
+        self.pull_action.send_goal(pull_goal)
+
+        movement = Movement(dx = 0, dy = 0.2, dtheta = 0)
+        # movement = Movement(dx = 0, dy = 0, dtheta = 45)
+        goal = MoveGoal(delta_move=movement)
+        self.move_ac.send_goal(goal)
+
+        self.pull_action.wait_for_result(timeout=rospy.Duration(10))
+        # assuming waiting for the pull action handles the waiting for arm movement
+        
+        pull_result = self.pull_action.get_result()
+        rospy.loginfo(f"Pull action completed with result: {pull_result.end_condition}")
+
+        self.move_ac.cancel_all_goals()
+
+        # Return a response to the service call
+        return CablePullTriggerResponse(success=True, message=f"Pull action completed with result: {pull_result.end_condition}")
 
     def main(self):
         # Open gripper
@@ -102,7 +131,6 @@ class CableTrace:
             return np.max(numbers) + 1
         except Exception as e:
             return 0
-      
 
 
 if __name__ == '__main__':

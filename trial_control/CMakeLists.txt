@@ -60,10 +60,12 @@ add_message_files(
 add_service_files(
   FILES
   PictureTrigger.srv
+  CablePullTrigger.srv
+  TactileGlobal.srv
 )
 ## Generate actions in the 'action' folder
 add_action_files(
-  FILES Record.action Move.action
+  FILES Record.action Move.action Pull.action
 )
 
 ## Generate added messages and services with any dependencies listed here
