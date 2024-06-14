@@ -88,7 +88,8 @@ class CableTrace:
 
         # Drive robot to start
         _ = input("Freedrive robot to start, then start program, then hit enter.")
-        self.file_num = self.get_start_file_index()
+        # self.file_num = self.get_start_file_index()
+        self.file_num = 0
 
         while not rospy.is_shutdown():
             if self.pull_triggered:
