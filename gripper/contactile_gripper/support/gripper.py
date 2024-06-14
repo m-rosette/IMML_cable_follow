@@ -14,7 +14,8 @@ except: import rospy_shadow as rospy
 class Gripper(object):
     """Class for the Oregon State IMML Contactile gripper."""
     def __init__(self,fast_start=False):
-        self.motor = dynamixel_motors.XM430_W210(1, 'FT5NSNJ0', 2.0, 4000000)
+        # self.motor = dynamixel_motors.XM430_W210(1, 'FT5NSNJ0', 2.0, 57600) # Old gripper
+        self.motor = dynamixel_motors.XM430_W210(1, 'FT89FCNP', 2.0, 57600) # New gripper
         self.grip_range = 3000  # Found from experimentation. Used for fast start method.
         self.mode_options = set(self.motor.operating_modes.keys())
         self.mode_options.add('off')

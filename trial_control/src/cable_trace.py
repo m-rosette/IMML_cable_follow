@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import rospy
-from trial_control.msg import MoveAction, MoveGoal, Movement, RecordGoal, RecordAction
+from trial_control.msg import MoveAction, MoveGoal, Movement, RecordGoal, RecordAction, PullGoal, PullAction
 from actionlib import SimpleActionClient
 from std_msgs.msg import String, Int16
 from lbc_project.srv import MoveData, MoveDataResponse
@@ -22,8 +22,9 @@ E) Call the move_arm action server
 
 class CableTrace:
     def __init__(self):
-        self.storage_directory = '/root/data'
+        self.storage_directory = '/data/grip_data/'
         self.file_num = 0
+        self.pull_triggered = False
         # Set up the movement action client
         self.move_ac = SimpleActionClient("move_server", MoveAction)
         rospy.loginfo("Waiting for movement server to come up.")
@@ -58,12 +59,14 @@ class CableTrace:
 
     def handle_cable_pull_trigger(self, req):
         rospy.loginfo("Cable pull service called")
+
+        self.pull_triggered = True
         
         # Send goal to pull action server
         pull_goal = PullGoal() # sending an empty goal
         self.pull_action.send_goal(pull_goal)
 
-        movement = Movement(dx = 0, dy = 0.2, dtheta = 0)
+        movement = Movement(dx = -20, dy = 0, dtheta = 0, vel=0.01)
         # movement = Movement(dx = 0, dy = 0, dtheta = 45)
         goal = MoveGoal(delta_move=movement)
         self.move_ac.send_goal(goal)
@@ -77,16 +80,21 @@ class CableTrace:
         self.move_ac.cancel_all_goals()
 
         # Return a response to the service call
-        return CablePullTriggerResponse(success=True, message=f"Pull action completed with result: {pull_result.end_condition}")
+        return CablePullTriggerResponse(success=True)
 
     def main(self):
         # Open gripper
-        self.gripper_pos_pub.publish("position_10000")
+        self.gripper_pos_pub.publish("position_3300")
+
         # Drive robot to start
         _ = input("Freedrive robot to start, then start program, then hit enter.")
         self.file_num = self.get_start_file_index()
 
         while not rospy.is_shutdown():
+            if self.pull_triggered:
+                rospy.loginfo(f"Cable pull controller activated")
+                break
+
             print("FILE NUM: ",self.file_num)
             goal = RecordGoal(file_name=str(self.file_num))
             self.record_ac.send_goal(goal)
@@ -101,25 +109,22 @@ class CableTrace:
             # Take a picture
             picture_return = self.pic(trial_num = str(self.file_num))
 
-
-            # print(result)
-
             # Open the gripper
-            self.gripper_pos_pub.publish("position_10000")
+            self.gripper_pos_pub.publish("position_3300")
 
             # TODO: Call LSTM service
             move_return = self.lstm(gripper_data = result.data, move_right=True)
 
             print(move_return)
-            #input("Enter to move")
 
             # Move robot with movement from LSTM
-            movement = Movement(dx = move_return.x, dy = move_return.y, dtheta = -move_return.angle)
+            # movement = Movement(dx = - move_return.x, dy = move_return.y, dtheta = -move_return.angle)
             # movement = Movement(dx = 0, dy = 0, dtheta = 45)
-            goal = MoveGoal(delta_move=movement)
-            self.move_ac.send_goal(goal)
-            self.move_ac.wait_for_result()
-            #input("Enter to continue to next step")
+            # goal = MoveGoal(delta_move=movement)
+            # self.move_ac.send_goal(goal)
+            # self.move_ac.wait_for_result()
+            input("Enter to continue to next step")
+
             self.file_num += 1
 
     def get_start_file_index(self):

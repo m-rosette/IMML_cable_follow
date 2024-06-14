@@ -41,8 +41,10 @@ class CableTrace:
         self.arm_group.allow_replanning(1)  
 
         # Create action server
-        self.move_server = SimpleActionServer("move_server", MoveAction, execute_cb=self.mod_position_callback, auto_start=False, cancel_callback=self.cancel_callback)
-        # self.move_server.register_cancel_callback(self.cancel_callback)
+        self.move_server = SimpleActionServer("move_server", MoveAction, execute_cb=self.mod_position_callback, auto_start=False) #, cancel_callback=self.cancel_callback)
+        if self.move_server.is_preempt_requested():
+          rospy.loginfo('Action Preemted')
+          self.move_server.set_preempted()
         self.move_server.start()
         rospy.loginfo("Move server up!")
     
@@ -63,16 +65,21 @@ class CableTrace:
 
       self.arm_group.set_pose_reference_frame("tool0")
       final_pose = PoseStamped()
-      final_pose.pose.position.y = goal.delta_move.dx/1000
+      final_pose.pose.position.x = goal.delta_move.dx/1000
       final_pose.pose.position.z = goal.delta_move.dy/1000
 
-      q_change = quaternion_from_euler(-np.deg2rad(goal.delta_move.dtheta), 0, 0) 
+      # self.arm_group.set_max_velocity_scaling_factor(goal.delta_move.vel)
+
+      q_change = quaternion_from_euler(0, -np.deg2rad(goal.delta_move.dtheta), 0) 
       final_pose.pose.orientation.x = q_change[0]
       final_pose.pose.orientation.y = q_change[1]
       final_pose.pose.orientation.z = q_change[2]
       final_pose.pose.orientation.w = q_change[3]
       
-      plan, fraction = self.arm_group.compute_cartesian_path([final_pose.pose], 0.01,2) 
+      plan, fraction = self.arm_group.compute_cartesian_path([final_pose.pose], 0.01, 2) 
+
+      plan = self.arm_group.retime_trajectory(self.arm_group.get_current_state(), plan, goal.delta_move.vel)
+
       if fraction > .99:  
         success = self.arm_group.execute(plan)
       else: 

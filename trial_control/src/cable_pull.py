@@ -5,10 +5,11 @@ import rospy
 import time
 import threading
 from std_msgs.msg import String, Int16
-from actionlib import SimpleActionClient
+from actionlib import SimpleActionClient, SimpleActionServer
 from papillarray_ros_v2.msg import SensorState
 from trial_control.msg import PullAction, PullGoal, PullFeedback, PullResult
 from trial_control.srv import PictureTrigger, PictureTriggerResponse, TactileGlobal, CablePullTrigger
+from geometry_msgs.msg import PoseStamped
 import os
 import numpy as np
 
@@ -16,9 +17,9 @@ import numpy as np
 class CablePull:
     def __init__(self):
         # Initialize gripper variables
-        self.grip_current = 18.0
+        self.grip_current = 3.0
         self.grip_force_increment = 2
-        self.grip_max = 80
+        self.grip_max = 10
         self.cable_state_tactile = True
         self.disconnection_factor = 0.6
         self.tactile_0_global_y_prev = 0
@@ -31,7 +32,8 @@ class CablePull:
         self.global_y_max = 5.0
         self.global_z_max = 9.0
         self.global_z_exceeded = False
-        self.global_y_exceeded = False    
+        self.global_y_exceeded = False   
+        self.ur5_y_pos = 0
 
         # Initialize sliding window slope variables
         self.preset_slope = 0.005    # Set your desired preset slope
@@ -42,14 +44,13 @@ class CablePull:
         # Gripper Publisher
         self.gripper_pos_pub = rospy.Publisher('Gripper_Cmd', String, queue_size=5)
 
-        # Subscribe to tactile sensor feedback
-        self.tactile_0_sub = rospy.Subscriber('hub_0/sensor_0', SensorState, self.tactile_0_callback)
-        self.tactile_1_sub = rospy.Subscriber('hub_0/sensor_1', SensorState, self.tactile_1_callback)
+        # Subscribe to UR5
+        rospy.Subscriber('end_effector_position', PoseStamped, self.ur5_callback)
 
         # Create service server
-        rospy.wait_for_service('tactile_global_check')
+        rospy.wait_for_service('tactile_global')
         rospy.loginfo("Global tactile service up, ready!")
-        self.tactile_global = rospy.ServiceProxy('tactile_global_check', TactileGlobal)
+        self.tactile_global = rospy.ServiceProxy('tactile_global', TactileGlobal)
 
         # Create action server
         self.pull_server = SimpleActionServer("pull_server", PullAction, execute_cb=self.pull_test_callback, auto_start=False)
@@ -57,16 +58,10 @@ class CablePull:
 
         rospy.loginfo("Everything up!")
 
-    def check_threshold_force(self):
-        if self.tactile_0_global_xyz[2] > global_z_threshold or self.tactile_1_global_xyz[2] > global_z_threshold:
-            self.global_z_exceeded = True
-            rospy.logwarn("Global tactile Z force threshold exceeded. Terminating cable pull")
-            break
-        
-        if np.abs(self.tactile_0_global_xyz[1]) > global_y_threshold or np.abs(self.tactile_1_global_xyz[1]) > global_y_threshold:
-            self.global_y_exceeded = True
-            rospy.logwarn("Global tactile Y force threshold exceeded. Terminating cable pull")
-            break
+    def ur5_callback(self):
+        # rospy.loginfo(f"Received end effector position: {data.pose.position}")
+        # rospy.loginfo(f"Received end effector orientation: {data.pose.orientation}")
+        self.ur5_y_pos = data.pose.position.x
 
     def slip_check(self, x_data, y_data):
         self.numerator_diff = np.diff(y_data[-self.window_size-1:])
@@ -80,9 +75,9 @@ class CablePull:
                 return avg_num_diff / avg_denom_diff
         return None
 
-    def pull_test_callback(self):
+    def pull_test_callback(self, goal):
         # Initialize lists to store data for slope calculation
-        stepper_pos = []
+        ur5_y_pos_ls = []
         global_y_tactile_0 = []
         global_y_tactile_1 = []
 
@@ -92,16 +87,24 @@ class CablePull:
             self.tactile_1_global_xyz = self.global_force.tactile1_global
             time.sleep(0.1)
 
-            self.check_threshold_force()
+            if self.tactile_0_global_xyz[2] > self.global_z_max or self.tactile_1_global_xyz[2] > self.global_z_max:
+                self.global_z_exceeded = True
+                rospy.logwarn("Global tactile Z force threshold exceeded. Terminating cable pull")
+                break
+            
+            if np.abs(self.tactile_0_global_xyz[1]) > self.global_y_max or np.abs(self.tactile_1_global_xyz[1]) > self.global_y_max:
+                self.global_y_exceeded = True
+                rospy.logwarn("Global tactile Y force threshold exceeded. Terminating cable pull")
+                break
 
             # Get current data for slope calculation and add to lists
-            stepper_pos.append(self.cable_pull_jig_state.stepper_position)
+            ur5_y_pos_ls.append(self.ur5_y_pos)
             global_y_tactile_0.append(self.tactile_0_global_xyz[1])
             global_y_tactile_1.append(self.tactile_1_global_xyz[1])
 
             # Get slip slope
-            current_slope_0 = self.slip_check(stepper_pos, global_y_tactile_0)
-            current_slope_1 = self.slip_check(stepper_pos, global_y_tactile_1)
+            current_slope_0 = self.slip_check(ur5_y_pos_ls, global_y_tactile_0)
+            current_slope_1 = self.slip_check(ur5_y_pos_ls, global_y_tactile_1)
 
             # Slip detection
             if current_slope_0 is not None and current_slope_1 is not None:
@@ -136,7 +139,7 @@ class CablePull:
             self.pull_server.set_succeeded(self.result)
 
             # Open the gripper
-            self.gripper_pos_pub.publish("position_10000")
+            self.gripper_pos_pub.publish("position_3300")
         
         if self.global_y_exceeded == False and self.global_z_exceeded == False:
             rospy.loginfo("Cable unseated")
@@ -148,7 +151,7 @@ class CablePull:
             self.pull_server.set_succeeded(self.result)
 
             # Open the gripper
-            self.gripper_pos_pub.publish("position_10000")
+            self.gripper_pos_pub.publish("position_3300")
                 
 
     def main(self):

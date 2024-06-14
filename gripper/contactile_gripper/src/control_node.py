@@ -58,6 +58,10 @@ class ControlNode(object):
         rospy.on_shutdown(self.shutdown_function)
         self.main_loop_rate = 30  # Hz
         self.main_loop_rate_obj = rospy.Rate(self.main_loop_rate)
+
+        # Biasing tactile sensors
+        srv_clients.bias_request_srv_client()
+        
         self.main_loop()
 
 

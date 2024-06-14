@@ -19,7 +19,7 @@ import shutil
 
 class Record:
     def __init__(self):
-        self.storage_directory = '/root/data'
+        self.storage_directory = '/data/grip_data/'
         # The file number we are saving 
         # self.file_num = self.get_start_file_index()
 
@@ -40,15 +40,11 @@ class Record:
         self.record_server = SimpleActionServer("record_server", RecordAction, execute_cb=self.action_callback, auto_start=False)
         self.record_server.start()
         self.result = RecordResult()
-        rospy.loginfo("Everything up!")
-
-        self.storage_directory = '/root/data'
-
-
-        
+        rospy.loginfo("Everything up!")      
    
     def action_callback(self, goal):
-        self.file_name = goal.file_name
+        # self.file_name = goal.file_name
+        self.file_name = "0_0"
         rospy.loginfo("Recording starting. Saving to %s.csv", self.file_name)
 
         # Combine all of the data into one dictionary
@@ -60,7 +56,7 @@ class Record:
         self.mutex.release()
         t1 = time.time()
         # print("tactile: ", self.tactile_0)
-        with open('/root/data/' + str(self.file_name) + '.csv', 'w') as csvfile:
+        with open(self.storage_directory + str(self.file_name) + '.csv', 'w') as csvfile:
             # Write the header
             w = csv.DictWriter(csvfile, combined_dict)
             w.writeheader()
@@ -78,9 +74,9 @@ class Record:
                 self.mutex.release()
                 w.writerow(combined_dict)
                 self.r.sleep()
-        shutil.copy('/root/data/' + str(self.file_name) + '.csv', '/root/data/temp_0.csv')
+        shutil.copy(self.storage_directory + str(self.file_name) + '.csv', self.storage_directory + 'temp_0.csv')
         # Read in csv and convert to float32 array
-        my_data = np.genfromtxt('/root/data/' + str(self.file_name) + '.csv', delimiter=',')
+        my_data = np.genfromtxt(self.storage_directory + str(self.file_name) + '.csv', delimiter=',')
         # Get just the last 30 rows
         my_data = my_data[-30:].astype(dtype=np.float32)
         # Flatten
@@ -105,7 +101,7 @@ class Record:
         #self.tactile_0 = tac_in
         self.mutex.acquire()
         self.tactile_0 = {} 
-        for i in range(8):
+        for i in range(9):
             
             self.tactile_0['0_dX_'+str(i)] = tac_in.pillars[i].dX
             self.tactile_0['0_dY_'+str(i)] = tac_in.pillars[i].dY
@@ -127,7 +123,7 @@ class Record:
         # Saves the subscribed tactile 1 data to variable
         self.mutex.acquire()
         self.tactile_1 = {}
-        for i in range(8):
+        for i in range(9):
             
             self.tactile_1['1_dX_'+str(i)] = tac_in.pillars[i].dX
             self.tactile_1['1_dY_'+str(i)] = tac_in.pillars[i].dY
@@ -155,7 +151,7 @@ class Record:
         self.tactile_0 = {}
         self.tactile_1 = {}
 
-        for i in range(8):
+        for i in range(9):
             self.tactile_0['0_dX_'+str(i)] = None
             self.tactile_0['0_dY_'+str(i)] = None
             self.tactile_0['0_dZ_'+str(i)] = None

@@ -27,8 +27,9 @@ class TakePicture:
         #capture frame and save it under trial number
         cap = cv2.VideoCapture(2) 
         ret,frame = cap.read()
-        cv2.imwrite('/root/images/' + msg.trial_num + '.jpg',frame)
-        cv2.imwrite('/root/images/' + "temp_0" + '.jpg',frame)
+        cv2.imwrite('/data/images/0_0.jpg',frame)
+        # cv2.imwrite('/root/images/' + msg.trial_num + '.jpg',frame)
+        # cv2.imwrite('/root/images/' + "temp_0" + '.jpg',frame)
         cap.release()
 
         # #get mask and skeleton estimate

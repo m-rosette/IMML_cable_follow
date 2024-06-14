@@ -17,7 +17,8 @@ def find_contactile_port():
     """Returns the comport path for the contactile sensor hub."""
     comport_info = get_com_info()
     for port in comport_info:
-        if port['serial_number'] == '10129740':
+        # if port['serial_number'] == '10129740': # Original contactile sensors
+        if port['serial_number'] == '13442510': # Newer contactile sensors
             return port['device']
     print("\nContactile sensor hub port info not found.\n")
     raise LookupError
