@@ -19,7 +19,7 @@ import shutil
 
 class Record:
     def __init__(self):
-        self.storage_directory = '/data/grip_data/'
+        self.storage_directory = '/data/'
         # The file number we are saving 
         # self.file_num = self.get_start_file_index()
 
@@ -43,8 +43,8 @@ class Record:
         rospy.loginfo("Everything up!")      
    
     def action_callback(self, goal):
-        self.file_name = goal.file_name
-        # self.file_name = "0_0"
+        # self.file_name = goal.file_name
+        self.file_name = "0_0"
         rospy.loginfo("Recording starting. Saving to %s.csv", self.file_name)
 
         # Combine all of the data into one dictionary

@@ -6,6 +6,7 @@ from actionlib import SimpleActionClient
 from std_msgs.msg import String, Int16
 from lbc_project.srv import MoveData, MoveDataResponse
 from trial_control.srv import PictureTrigger, PictureTriggerResponse, CablePullTrigger, CablePullTriggerResponse
+from papillarray_ros_v2.srv import *
 import os
 """
 1) Freedrive the robot to the the starting location on the cable
@@ -22,7 +23,7 @@ E) Call the move_arm action server
 
 class CableTrace:
     def __init__(self):
-        self.storage_directory = '/data/grip_data/'
+        self.storage_directory = '/data/'
         self.file_num = 0
         self.pull_triggered = False
         # Set up the movement action client
@@ -57,6 +58,16 @@ class CableTrace:
         self.pull_action.wait_for_server()
         rospy.loginfo("Pull action server up!")
 
+        # Bias tactile sensors
+        self.bias_request_srv_client()
+        rospy.loginfo("Biasing tactile sensors")
+
+    def bias_request_srv_client(self):
+        rospy.wait_for_service('/hub_0/send_bias_request')
+        srv = rospy.ServiceProxy('/hub_0/send_bias_request', BiasRequest)
+        success = srv()
+        return success
+
     def handle_cable_pull_trigger(self, req):
         rospy.loginfo("Cable pull service called")
 
@@ -88,10 +99,13 @@ class CableTrace:
 
         # Drive robot to start
         _ = input("Freedrive robot to start, then start program, then hit enter.")
-        # self.file_num = self.get_start_file_index()
-        self.file_num = 0
+        self.file_num = self.get_start_file_index()
+        # self.file_num = 0
 
         while not rospy.is_shutdown():
+            # Bias the sensors every time the gripper is open
+            self.bias_request_srv_client()
+
             if self.pull_triggered:
                 rospy.loginfo(f"Cable pull controller activated")
                 break
@@ -101,7 +115,7 @@ class CableTrace:
             self.record_ac.send_goal(goal)
 
             # Close gripper
-            self.gripper_pos_pub.publish("current_3")
+            self.gripper_pos_pub.publish("current_5")
             rospy.sleep(2.5) # Sleep a tiny bit then stop recording
             
             self.record_ac.wait_for_result()
@@ -119,11 +133,11 @@ class CableTrace:
             print(move_return)
 
             # Move robot with movement from LSTM
-            # movement = Movement(dx = - move_return.x, dy = move_return.y, dtheta = -move_return.angle)
+            movement = Movement(dx = - move_return.x, dy = move_return.y, dtheta = -move_return.angle)
             # movement = Movement(dx = 0, dy = 0, dtheta = 45)
-            # goal = MoveGoal(delta_move=movement)
-            # self.move_ac.send_goal(goal)
-            # self.move_ac.wait_for_result()
+            goal = MoveGoal(delta_move=movement)
+            self.move_ac.send_goal(goal)
+            self.move_ac.wait_for_result()
             input("Enter to continue to next step")
 
             self.file_num += 1
