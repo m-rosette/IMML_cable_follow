@@ -19,7 +19,7 @@ import shutil
 
 class Record:
     def __init__(self):
-        self.storage_directory = '/data/'
+        self.storage_directory = '/data/grip_data/'
         # The file number we are saving 
         # self.file_num = self.get_start_file_index()
 

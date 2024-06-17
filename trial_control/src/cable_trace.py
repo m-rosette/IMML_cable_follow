@@ -23,7 +23,7 @@ E) Call the move_arm action server
 
 class CableTrace:
     def __init__(self):
-        self.storage_directory = '/data/'
+        self.storage_directory = '/data/grip_data/'
         self.file_num = 0
         self.pull_triggered = False
         # Set up the movement action client
@@ -133,7 +133,8 @@ class CableTrace:
             print(move_return)
 
             # Move robot with movement from LSTM
-            movement = Movement(dx = - move_return.x, dy = move_return.y, dtheta = -move_return.angle)
+            movement = Movement(dx = - move_return.x, dy = move_return.y, dtheta = move_return.angle)
+            # movement = Movement(dx = - move_return.y, dy = move_return.x, dtheta = move_return.angle)
             # movement = Movement(dx = 0, dy = 0, dtheta = 45)
             goal = MoveGoal(delta_move=movement)
             self.move_ac.send_goal(goal)

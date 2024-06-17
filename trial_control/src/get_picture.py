@@ -25,7 +25,7 @@ class TakePicture:
 
     def trigger_callback(self, msg):
         #capture frame and save it under trial number
-        cap = cv2.VideoCapture(0) 
+        cap = cv2.VideoCapture(2) 
         ret,frame = cap.read()
         cv2.imwrite('/data/images/0_0.jpg',frame)
         # cv2.imwrite('/data/images/' + msg.trial_num + '.jpg',frame)
