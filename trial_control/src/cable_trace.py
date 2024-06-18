@@ -115,7 +115,7 @@ class CableTrace:
             self.record_ac.send_goal(goal)
 
             # Close gripper
-            self.gripper_pos_pub.publish("current_5")
+            self.gripper_pos_pub.publish("current_3")
             rospy.sleep(2.5) # Sleep a tiny bit then stop recording
             
             self.record_ac.wait_for_result()
@@ -134,8 +134,8 @@ class CableTrace:
 
             # Move robot with movement from LSTM
             movement = Movement(dx = - move_return.x, dy = move_return.y, dtheta = move_return.angle)
-            # movement = Movement(dx = - move_return.y, dy = move_return.x, dtheta = move_return.angle)
-            # movement = Movement(dx = 0, dy = 0, dtheta = 45)
+            # # movement = Movement(dx = - move_return.y, dy = move_return.x, dtheta = move_return.angle)
+            # # movement = Movement(dx = 0, dy = 0, dtheta = 45)
             goal = MoveGoal(delta_move=movement)
             self.move_ac.send_goal(goal)
             self.move_ac.wait_for_result()

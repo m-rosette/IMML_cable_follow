@@ -70,7 +70,7 @@ class CableTrace:
 
       # self.arm_group.set_max_velocity_scaling_factor(goal.delta_move.vel)
 
-      q_change = quaternion_from_euler(0, np.deg2rad(goal.delta_move.dtheta), 0) 
+      q_change = quaternion_from_euler(0, -np.deg2rad(goal.delta_move.dtheta), 0) 
       final_pose.pose.orientation.x = q_change[0]
       final_pose.pose.orientation.y = q_change[1]
       final_pose.pose.orientation.z = q_change[2]
