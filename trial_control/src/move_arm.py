@@ -48,6 +48,8 @@ class CableTrace:
         self.move_server.start()
         rospy.loginfo("Move server up!")
     
+        # Initialize a variable to track the cancel status
+        self.cancel_requested = False
         
     def mod_position_callback(self, goal):
       """ Modifies the end effector position in 2D
@@ -62,6 +64,13 @@ class CableTrace:
       """
 
       print(goal.delta_move)
+
+      if self.cancel_requested:
+        rospy.loginfo("Goal cancellation requested. Stopping arm movement...")
+        self.arm_group.stop()
+        self.move_server.set_preempted()
+        self.cancel_requested = False  # Reset cancel flag
+        return
 
       self.arm_group.set_pose_reference_frame("tool0")
       final_pose = PoseStamped()
@@ -93,8 +102,8 @@ class CableTrace:
 
 
     def cancel_callback(self):
-      self.arm_group.stop()
-      self.move_server.set_aborted()
+      rospy.loginfo("Goal cancellation requested.")
+      self.cancel_requested = True
 
     def main(self):
       rospy.spin()

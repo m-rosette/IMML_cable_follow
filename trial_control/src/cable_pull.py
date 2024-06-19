@@ -24,11 +24,11 @@ import matplotlib.pyplot as plt
 class CablePull:
     def __init__(self):
         # Initialize gripper variables
-        self.grip_current = 18.0
+        self.grip_current = 10.0
         self.grip_force_increment = 2
-        self.grip_max = 60
+        self.grip_max = 40
         self.cable_state_tactile = True
-        self.disconnection_factor = 0.8 # used 0.6 for IMECE
+        self.disconnection_factor = 0.7 # used 0.6 for IMECE
         self.tactile_0_global_y_prev = 0
         self.tactile_1_global_y_prev = 0
         self.tactile_0_slipstate = []
@@ -36,14 +36,14 @@ class CablePull:
         self.tactile_0_global_xyz = []
         self.tactile_1_global_xyz = []
         self.global_x_max = 4.0
-        self.global_y_max = 5.0
+        self.global_y_max = 2.0
         self.global_z_max = 9.0
         self.global_z_exceeded = False
         self.global_y_exceeded = False   
         self.ur5_y_pos = 0
 
         # Initialize sliding window slope variables
-        self.preset_slope = 0.005    # Set your desired preset slope
+        self.preset_slope = 200.0    # Set your desired preset slope
         self.window_size = 10
         self.numerator_diff = []
         self.denominator_diff = []
@@ -76,7 +76,8 @@ class CablePull:
 
     def preempt_movement(self):
         # Send preempt request to CableTrace
-        self.move_client.cancel_goal()
+        self.move_client.cancel_all_goals()
+        rospy.loginfo("Canceling ur5 movement")
 
     def get_tool0_pose(self):
         try:
@@ -140,6 +141,8 @@ class CablePull:
         temp_tactile1_list = []
         discon0 = []
         discon1 = []
+        slipslope0 = []
+        slipslope1 = []
 
         #open gripper
         self.gripper_pos_pub.publish(f"position_3300")
@@ -152,22 +155,32 @@ class CablePull:
         time.sleep(0.5)
         
         iteration = 0
+        success = True  # Assume success initially
+
         while self.cable_state_tactile:
+            if self.pull_server.is_preempt_requested():
+                rospy.loginfo('Pull action preempted')
+                self.pull_server.set_preempted()
+                success = False
+                break
+
             self.global_force = self.tactile_global()
             self.tactile_0_global_xyz = self.global_force.tactile0_global
             self.tactile_1_global_xyz = self.global_force.tactile1_global
-            # time.sleep(0.1)
+            time.sleep(0.1)
 
             if self.tactile_0_global_xyz[2] > self.global_z_max or self.tactile_1_global_xyz[2] > self.global_z_max:
                 self.global_z_exceeded = True
                 rospy.logwarn("Global tactile Z force threshold exceeded. Terminating cable pull")
-                self.preempt_movement()
+                # self.preempt_movement()
+                success = False 
                 break
             
             if np.abs(self.tactile_0_global_xyz[1]) > self.global_y_max or np.abs(self.tactile_1_global_xyz[1]) > self.global_y_max:
                 self.global_y_exceeded = True
                 rospy.logwarn("Global tactile Y force threshold exceeded. Terminating cable pull")
-                self.preempt_movement()
+                # self.preempt_movement()
+                success = False
                 break
 
             # Get current data for slope calculation and add to lists
@@ -180,8 +193,12 @@ class CablePull:
             current_slope_0 = self.slip_check(ur5_y_pos_ls, global_y_tactile_0)
             current_slope_1 = self.slip_check(ur5_y_pos_ls, global_y_tactile_1)
 
-            # Slip detection
-            if current_slope_0 is not None and current_slope_1 is not None:
+            # Slip detection    
+            if current_slope_0 is not None and current_slope_1 is not None and iteration < 40: # TEMPORARY ITERATION 50 CHECK ================================================
+
+                slipslope0.append(np.abs(current_slope_0))
+                slipslope1.append(np.abs(current_slope_1))
+
                 # If current slope is greater than the slip_slop -> increase grip
                 if np.abs(current_slope_0) > self.preset_slope or np.abs(current_slope_1) > self.preset_slope:
                     self.grip_current += self.grip_force_increment
@@ -191,13 +208,15 @@ class CablePull:
             # Safety grip force check
             if self.grip_current > self.grip_max:
                 rospy.logwarn('max grip reached')
-                plt.plot(temp_tactile0_list)
-                # plt.plot(temp_tactile1_list)
                 plt.plot(discon0)
-                # plt.plot(discon1)
+                # plt.plot(temp_tactile1_list)
+                # plt.plot(slipslope1)
+                plt.plot(discon1)
                 # plt.show()
                 plt.savefig('/root/catkin_ws/src/trial_control/src/images/plot.png')  # Save the plot to a file
-                self.preempt_movement()
+                print(iteration)
+                # self.preempt_movement()
+                success = False
                 break
             
             # Check if there is cable disconnection
@@ -214,11 +233,12 @@ class CablePull:
             # Checking for cable disconnection
             diff0 = np.abs(self.tactile_0_global_xyz[1]) - self.disconnection_factor * np.abs(recent_tactile_0_avg)
             diff1 = np.abs(self.tactile_1_global_xyz[1]) - self.disconnection_factor * np.abs(recent_tactile_1_avg)
-            if iteration > 5:
+            if iteration > 7:
                 if diff0 < 0 or diff1 < 0:
                     self.cable_state_tactile = False
                     rospy.logwarn("Cable disconnected")
-                    self.preempt_movement()
+                    # self.preempt_movement()
+                    success = False
 
             # if iteration > 5:
             #     if (np.abs(self.tactile_0_global_xyz[1]) - self.disconnection_factor * np.abs(recent_tactile_0_avg)) < 0:
@@ -230,30 +250,42 @@ class CablePull:
             self.tactile_0_global_y_prev = self.tactile_0_global_xyz[1]
             self.tactile_1_global_y_prev = self.tactile_1_global_xyz[1]
 
-        if self.global_y_exceeded or self.global_z_exceeded:
-            # Stop moving the arm
-            self.result = PullResult()
-            self.result.end_condition = "global force exceeded"
-            self.pull_server.set_succeeded(self.result)
-            self.preempt_movement()
+            if self.global_y_exceeded or self.global_z_exceeded:
+                # Stop moving the arm
+                self.result = PullResult()
+                self.result.end_condition = "global force exceeded"
+                self.pull_server.set_succeeded(self.result)
+                # self.preempt_movement()
+                success = False 
 
-            # Open the gripper
-            self.gripper_pos_pub.publish("position_3300")
+                # Open the gripper
+                self.gripper_pos_pub.publish("position_3300")
+            
+            # if self.global_y_exceeded == False and self.global_z_exceeded == False:
+            #     rospy.loginfo("Cable unseated")
+            #     time.sleep(1)
+
+            #     # Stop moving the arm
+            #     self.result = PullResult()
+            #     self.result.end_condition = "cable unseated"
+            #     self.pull_server.set_succeeded(self.result)
+            #     self.preempt_movement()
+
+            #     # Open the gripper
+            #     self.gripper_pos_pub.publish("position_3300")
+            
+            iteration += 1
+
+        self.preempt_movement()
+        self.gripper_pos_pub.publish("position_3300")
+
+        result = PullResult()
+        result.end_condition = "success" if success else "failure"
+        if success:
+            self.pull_server.set_succeeded(result)
+        else:
+            self.pull_server.set_aborted(result)
         
-        if self.global_y_exceeded == False and self.global_z_exceeded == False:
-            rospy.loginfo("Cable unseated")
-            time.sleep(1)
-
-            # Stop moving the arm
-            self.result = PullResult()
-            self.result.end_condition = "cable unseated"
-            self.pull_server.set_succeeded(self.result)
-            self.preempt_movement()
-
-            # Open the gripper
-            self.gripper_pos_pub.publish("position_3300")
-        
-        iteration += 1
 
     def main(self):
         rospy.spin()

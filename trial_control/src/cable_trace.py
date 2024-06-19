@@ -80,6 +80,7 @@ class CableTrace:
         else:
             rospy.logwarn("Pull action did not finish within the timeout.")
             self.pull_action.cancel_all_goals()
+            self.cancel_move_goal()
 
     def send_move_goal(self):
         movement = Movement(dx=-50, dy=0, dtheta=0, vel=0.005)
@@ -113,6 +114,10 @@ class CableTrace:
 
         # Return a response to the service call
         return CablePullTriggerResponse(success=True)
+
+    def cancel_move_goal(self):
+        rospy.loginfo("Canceling move action goal")
+        self.move_ac.cancel_all_goals()
 
     # def handle_cable_pull_trigger(self, req):
     #     rospy.loginfo("Cable pull service called")
