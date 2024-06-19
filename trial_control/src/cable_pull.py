@@ -7,21 +7,28 @@ import threading
 from std_msgs.msg import String, Int16
 from actionlib import SimpleActionClient, SimpleActionServer
 from papillarray_ros_v2.msg import SensorState
-from trial_control.msg import PullAction, PullGoal, PullFeedback, PullResult
+from papillarray_ros_v2.srv import *
+from geometry_msgs.msg import Pose, PoseStamped
+from trial_control.msg import PullAction, PullGoal, PullFeedback, PullResult, MoveAction, MoveGoal, MoveFeedback, MoveResult
 from trial_control.srv import PictureTrigger, PictureTriggerResponse, TactileGlobal, CablePullTrigger
 from geometry_msgs.msg import PoseStamped
 import os
 import numpy as np
+import tf2_ros
+import tf2_geometry_msgs  # **Do not use geometry_msgs. Use this instead for PoseStamped
+from tf.transformations import *
+
+import matplotlib.pyplot as plt
 
 
 class CablePull:
     def __init__(self):
         # Initialize gripper variables
-        self.grip_current = 3.0
+        self.grip_current = 18.0
         self.grip_force_increment = 2
-        self.grip_max = 10
+        self.grip_max = 60
         self.cable_state_tactile = True
-        self.disconnection_factor = 0.6
+        self.disconnection_factor = 0.8 # used 0.6 for IMECE
         self.tactile_0_global_y_prev = 0
         self.tactile_1_global_y_prev = 0
         self.tactile_0_slipstate = []
@@ -44,8 +51,17 @@ class CablePull:
         # Gripper Publisher
         self.gripper_pos_pub = rospy.Publisher('Gripper_Cmd', String, queue_size=5)
 
+        # Create action client to communicate with CableTrace
+        self.move_client = SimpleActionClient("move_server", MoveAction)
+        rospy.loginfo("Waiting for move_server...")
+        self.move_client.wait_for_server()
+        rospy.loginfo("move_server found.")
+
         # Subscribe to UR5
-        rospy.Subscriber('end_effector_position', PoseStamped, self.ur5_callback)
+        # rospy.Subscriber('tool0', PoseStamped, self.ur5_callback)
+        # Create a TransformListener object
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
         # Create service server
         rospy.wait_for_service('tactile_global')
@@ -58,10 +74,49 @@ class CablePull:
 
         rospy.loginfo("Everything up!")
 
-    def ur5_callback(self):
-        # rospy.loginfo(f"Received end effector position: {data.pose.position}")
-        # rospy.loginfo(f"Received end effector orientation: {data.pose.orientation}")
-        self.ur5_y_pos = data.pose.position.x
+    def preempt_movement(self):
+        # Send preempt request to CableTrace
+        self.move_client.cancel_goal()
+
+    def get_tool0_pose(self):
+        try:
+            # Lookup the transform from the base frame to the tool0 frame
+            trans = self.tf_buffer.lookup_transform("base_link", "tool0", rospy.Time(0), rospy.Duration(1.0))
+
+            # Create a PoseStamped message to store the pose of tool0
+            pose = PoseStamped()
+            pose.header.stamp = rospy.Time.now()
+            pose.header.frame_id = "base_link"
+
+            # Set the position
+            pose.pose.position.x = trans.transform.translation.x
+            pose.pose.position.y = trans.transform.translation.y
+            self.ur5_y_pos = trans.transform.translation.y
+            # print(trans.transform.translation.y)
+            pose.pose.position.z = trans.transform.translation.z
+
+            # Set the orientation
+            pose.pose.orientation.x = trans.transform.rotation.x
+            pose.pose.orientation.y = trans.transform.rotation.y
+            pose.pose.orientation.z = trans.transform.rotation.z
+            pose.pose.orientation.w = trans.transform.rotation.w
+
+            return pose
+
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            rospy.logwarn("Transform lookup failed.")
+            return None
+
+    def bias_request_srv_client(self):
+        rospy.wait_for_service('/hub_0/send_bias_request')
+        srv = rospy.ServiceProxy('/hub_0/send_bias_request', BiasRequest)
+        success = srv()
+        return success
+
+    # def ur5_callback(self):
+    #     # rospy.loginfo(f"Received end effector position: {data.pose.position}")
+    #     # rospy.loginfo(f"Received end effector orientation: {data.pose.orientation}")
+    #     self.ur5_y_pos = data.pose.position.x
 
     def slip_check(self, x_data, y_data):
         self.numerator_diff = np.diff(y_data[-self.window_size-1:])
@@ -81,23 +136,42 @@ class CablePull:
         global_y_tactile_0 = []
         global_y_tactile_1 = []
 
+        temp_tactile0_list = []
+        temp_tactile1_list = []
+        discon0 = []
+        discon1 = []
+
+        #open gripper
+        self.gripper_pos_pub.publish(f"position_3300")
+
+        self.bias_request_srv_client()
+        rospy.loginfo("Biasing tactile sensors")
+
+        self.gripper_pos_pub.publish(f"current_10")
+        rospy.loginfo("Closing the gripper")
+        time.sleep(0.5)
+        
+        iteration = 0
         while self.cable_state_tactile:
             self.global_force = self.tactile_global()
             self.tactile_0_global_xyz = self.global_force.tactile0_global
             self.tactile_1_global_xyz = self.global_force.tactile1_global
-            time.sleep(0.1)
+            # time.sleep(0.1)
 
             if self.tactile_0_global_xyz[2] > self.global_z_max or self.tactile_1_global_xyz[2] > self.global_z_max:
                 self.global_z_exceeded = True
                 rospy.logwarn("Global tactile Z force threshold exceeded. Terminating cable pull")
+                self.preempt_movement()
                 break
             
             if np.abs(self.tactile_0_global_xyz[1]) > self.global_y_max or np.abs(self.tactile_1_global_xyz[1]) > self.global_y_max:
                 self.global_y_exceeded = True
                 rospy.logwarn("Global tactile Y force threshold exceeded. Terminating cable pull")
+                self.preempt_movement()
                 break
 
             # Get current data for slope calculation and add to lists
+            self.get_tool0_pose()
             ur5_y_pos_ls.append(self.ur5_y_pos)
             global_y_tactile_0.append(self.tactile_0_global_xyz[1])
             global_y_tactile_1.append(self.tactile_1_global_xyz[1])
@@ -112,21 +186,45 @@ class CablePull:
                 if np.abs(current_slope_0) > self.preset_slope or np.abs(current_slope_1) > self.preset_slope:
                     self.grip_current += self.grip_force_increment
                     rospy.loginfo(f"Slip detected [New Current Goal: {self.grip_current}]")
-
-                    self.gripper_pos_pub.publish(f"current_{str(self.grip_current)}")
+                    self.gripper_pos_pub.publish(f"current_{str(int(self.grip_current))}")
 
             # Safety grip force check
             if self.grip_current > self.grip_max:
                 rospy.logwarn('max grip reached')
+                plt.plot(temp_tactile0_list)
+                # plt.plot(temp_tactile1_list)
+                plt.plot(discon0)
+                # plt.plot(discon1)
+                # plt.show()
+                plt.savefig('/root/catkin_ws/src/trial_control/src/images/plot.png')  # Save the plot to a file
+                self.preempt_movement()
                 break
             
             # Check if there is cable disconnection
             # Get the average over the last three global y-force readings
             recent_tactile_0_avg = np.average(global_y_tactile_0[-3:])
             recent_tactile_1_avg = np.average(global_y_tactile_1[-3:])
-            if np.abs(self.tactile_0_global_xyz[1]) < self.disconnection_factor * np.abs(recent_tactile_0_avg) or np.abs(self.tactile_1_global_xyz[1]) < self.disconnection_factor * np.abs(recent_tactile_1_avg):
-                self.cable_state_tactile = False
-                rospy.logwarn("Cable disconnected")
+
+            # Saving data for plot validation
+            temp_tactile0_list.append(np.abs(self.tactile_0_global_xyz[1]))
+            temp_tactile1_list.append(np.abs(self.tactile_1_global_xyz[1]))
+            discon0.append(self.disconnection_factor * np.abs(recent_tactile_0_avg))
+            discon1.append(self.disconnection_factor * np.abs(recent_tactile_1_avg))
+
+            # Checking for cable disconnection
+            diff0 = np.abs(self.tactile_0_global_xyz[1]) - self.disconnection_factor * np.abs(recent_tactile_0_avg)
+            diff1 = np.abs(self.tactile_1_global_xyz[1]) - self.disconnection_factor * np.abs(recent_tactile_1_avg)
+            if iteration > 5:
+                if diff0 < 0 or diff1 < 0:
+                    self.cable_state_tactile = False
+                    rospy.logwarn("Cable disconnected")
+                    self.preempt_movement()
+
+            # if iteration > 5:
+            #     if (np.abs(self.tactile_0_global_xyz[1]) - self.disconnection_factor * np.abs(recent_tactile_0_avg)) < 0:
+            #     # if np.abs(self.tactile_0_global_xyz[1]) < self.disconnection_factor * np.abs(recent_tactile_0_avg): # or np.abs(self.tactile_1_global_xyz[1]) < self.disconnection_factor * np.abs(recent_tactile_1_avg):
+            #         self.cable_state_tactile = False
+            #         rospy.logwarn("Cable disconnected")
             
             # Update the previous global readings
             self.tactile_0_global_y_prev = self.tactile_0_global_xyz[1]
@@ -137,6 +235,7 @@ class CablePull:
             self.result = PullResult()
             self.result.end_condition = "global force exceeded"
             self.pull_server.set_succeeded(self.result)
+            self.preempt_movement()
 
             # Open the gripper
             self.gripper_pos_pub.publish("position_3300")
@@ -149,10 +248,12 @@ class CablePull:
             self.result = PullResult()
             self.result.end_condition = "cable unseated"
             self.pull_server.set_succeeded(self.result)
+            self.preempt_movement()
 
             # Open the gripper
             self.gripper_pos_pub.publish("position_3300")
-                
+        
+        iteration += 1
 
     def main(self):
         rospy.spin()

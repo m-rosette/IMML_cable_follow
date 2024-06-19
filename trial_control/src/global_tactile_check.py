@@ -27,7 +27,7 @@ class TactileGlobalCheck:
         self.tactile_1_global = [tac_msg.gfX, tac_msg.gfY, tac_msg.gfZ]
 
     def tactile_global_callback(self, request):
-        rospy.loginfo('Received global threshold request')
+        # rospy.loginfo('Received global threshold request')
         response = TactileGlobalResponse()
 
         try:

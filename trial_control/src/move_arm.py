@@ -65,6 +65,7 @@ class CableTrace:
 
       self.arm_group.set_pose_reference_frame("tool0")
       final_pose = PoseStamped()
+      final_pose.header.frame_id = "tool0"  # Ensure the frame ID is set
       final_pose.pose.position.x = goal.delta_move.dx/1000
       final_pose.pose.position.z = goal.delta_move.dy/1000
 

@@ -14,7 +14,7 @@
 <!-- <node pkg="lbc_project" name="move_server" type="move_server.py" output="screen" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' "/> -->
 <node pkg="trial_control" name="record" type="record.py" output="screen" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' "/>
 <node pkg="trial_control" name="global_tactile_check" type="global_tactile_check.py" output="screen" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' "/>
-<node pkg="trial_control" name="cable_pull" type="cable_pull.py" output="screen" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' "/>
+<!-- <node pkg="trial_control" name="cable_pull" type="cable_pull.py" output="screen" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' "/> -->
 <node pkg="trial_control" name="cable_trace" type="cable_trace.py" launch-prefix="xterm -e" output="screen"/>
 <!-- <node pkg="trial_control" name="cable_trace" type="cable_trace.py" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' "/> -->
 </launch>
