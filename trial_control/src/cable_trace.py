@@ -34,11 +34,11 @@ class CableTrace:
         self.move_ac.wait_for_server()
         rospy.loginfo("Movement server up!")
 
-        # Setup the recording action client
-        self.record_ac = SimpleActionClient("record_server", RecordAction)
-        rospy.loginfo("Waiting for recording server to come up.")
-        self.record_ac.wait_for_server()
-        rospy.loginfo("Recording server up!")
+        # # Setup the recording action client
+        # self.record_ac = SimpleActionClient("record_server", RecordAction)
+        # rospy.loginfo("Waiting for recording server to come up.")
+        # self.record_ac.wait_for_server()
+        # rospy.loginfo("Recording server up!")
 
         rospy.wait_for_service('picture_trigger')
         rospy.loginfo("Picture service up, ready!")
@@ -162,15 +162,15 @@ class CableTrace:
                 break
 
             print("FILE NUM: ",self.file_num)
-            goal = RecordGoal(file_name=str(self.file_num))
-            self.record_ac.send_goal(goal)
+            # goal = RecordGoal(file_name=str(self.file_num))
+            # self.record_ac.send_goal(goal)
 
             # Close gripper
-            self.gripper_pos_pub.publish("current_3")
-            rospy.sleep(2.5) # Sleep a tiny bit then stop recording
+            # self.gripper_pos_pub.publish("current_3")
+            # rospy.sleep(2.5) # Sleep a tiny bit then stop recording
             
-            self.record_ac.wait_for_result()
-            result = self.record_ac.get_result()
+            # self.record_ac.wait_for_result()
+            # result = self.record_ac.get_result()
 
             # Take a picture
             picture_return = self.pic(trial_num = str(self.file_num))

@@ -13,6 +13,9 @@ from copy import deepcopy as copy
 import threading
 import time
 import shutil
+import tf2_ros
+import tf2_geometry_msgs  # **Do not use geometry_msgs. Use this instead for PoseStamped
+from tf.transformations import *
 
 
 # Serves as an action client that starts data recording (saves data just to csv)
@@ -36,6 +39,13 @@ class Record:
         self.tactile_0_sub = rospy.Subscriber('hub_0/sensor_0', SensorState, self.tactile_0_callback)
         self.tactile_1_sub = rospy.Subscriber('hub_0/sensor_1', SensorState, self.tactile_1_callback)
 
+        # Create a TransformListener object
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
+        
+        # Initialize a timer to call the polling function at a specified interval (e.g., 10 Hz)
+        self.timer = rospy.Timer(rospy.Duration(1.0 / 20), self.poll_transform)
+
         # Create action server
         self.record_server = SimpleActionServer("record_server", RecordAction, execute_cb=self.action_callback, auto_start=False)
         self.record_server.start()
@@ -43,14 +53,15 @@ class Record:
         rospy.loginfo("Everything up!")      
    
     def action_callback(self, goal):
-        # self.file_name = goal.file_name
-        self.file_name = "0_0"
+        self.file_name = goal.file_name
+        # self.file_name = "0_0"
         rospy.loginfo("Recording starting. Saving to %s.csv", self.file_name)
 
         # Combine all of the data into one dictionary
         self.mutex.acquire()
-        
-        combined_dict = copy(self.position)
+        combined_dict = copy(self.current_time)
+        combined_dict.update(self.position)
+        combined_dict.update(self.ur5_y_pos)
         combined_dict.update(copy(self.tactile_0))#.update(copy(self.tactile_1))
         combined_dict.update(copy(self.tactile_1))
         self.mutex.release()
@@ -62,13 +73,17 @@ class Record:
             w.writeheader()
 
             while not self.record_server.is_preempt_requested() and not rospy.is_shutdown():
+                self.current_time['timestamp'] = time.time() 
+
                 # Combine all of the data into one dictionary
                 t2 = time.time()
                 delta = t2-t1
-                if delta > 2.5:
+                if delta > 7.5:
                     break
                 self.mutex.acquire()
-                combined_dict = copy(self.position)
+                combined_dict = copy(self.current_time)
+                combined_dict.update(self.position)
+                combined_dict.update(self.ur5_y_pos)
                 combined_dict.update(copy(self.tactile_0))#.update(copy(self.tactile_1))
                 combined_dict.update(copy(self.tactile_1))
                 self.mutex.release()
@@ -96,6 +111,14 @@ class Record:
         # Saves the subscribed gripper position data to variable
         self.position['gripper_pos'] = pos_in.data
 
+    def poll_transform(self, event):
+        # Lookup the transform from the base frame to the tool0 frame
+        try:
+            trans = self.tf_buffer.lookup_transform("base_link", "tool0", rospy.Time(0), rospy.Duration(1.0))
+            self.ur5_y_pos['ur5_y_pos'] = trans.transform.translation.y
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            rospy.logerr("Transform lookup failed")
+
     def tactile_0_callback(self, tac_in):
         # Saves the subscribed tactile 0 data to variable
         #self.tactile_0 = tac_in
@@ -112,6 +135,12 @@ class Record:
             self.tactile_0['0_incontact_'+str(i)] = tac_in.pillars[i].in_contact
             self.tactile_0['0_slipstate_'+str(i)] = tac_in.pillars[i].slip_state
 
+        self.tactile_0['0_gfx'] = tac_in.gfX
+        self.tactile_0['0_gfy'] = tac_in.gfY
+        self.tactile_0['0_gfz'] = tac_in.gfZ
+        self.tactile_0['0_gtx'] = tac_in.gtX
+        self.tactile_0['0_gty'] = tac_in.gtY
+        self.tactile_0['0_gtz'] = tac_in.gtZ
         self.tactile_0['0_friction_est'] = tac_in.friction_est
         self.tactile_0['0_target_grip_force'] = tac_in.target_grip_force
         self.tactile_0['0_is_sd_active'] = tac_in.is_sd_active
@@ -134,6 +163,12 @@ class Record:
             self.tactile_1['1_incontact_'+str(i)] = tac_in.pillars[i].in_contact
             self.tactile_1['1_slipstate_'+str(i)] = tac_in.pillars[i].slip_state
 
+        self.tactile_1['1_gfx'] = tac_in.gfX
+        self.tactile_1['1_gfy'] = tac_in.gfY
+        self.tactile_1['1_gfz'] = tac_in.gfZ
+        self.tactile_1['1_gtx'] = tac_in.gtX
+        self.tactile_1['1_gty'] = tac_in.gtY
+        self.tactile_1['1_gtz'] = tac_in.gtZ
         self.tactile_1['1_friction_est'] = tac_in.friction_est
         self.tactile_1['1_target_grip_force'] = tac_in.target_grip_force
         self.tactile_1['1_is_sd_active'] = tac_in.is_sd_active
@@ -145,8 +180,12 @@ class Record:
         """
         Initializes all of the keys in each ordered dictionary. This ensures the header and order is correct even if recording starts before data is published.
         """
-        # Position 
+        # Time
+        self.current_time = {'timestamp': None}
+        # Position
         self.position = {'gripper_pos': None}
+        # UR5 Position
+        self.ur5_y_pos = {'ur5_y_pos': 0}
         # Tactile sensor 
         self.tactile_0 = {}
         self.tactile_1 = {}
@@ -170,12 +209,24 @@ class Record:
             self.tactile_1['1_incontact_'+str(i)] = None
             self.tactile_1['1_slipstate_'+str(i)] = None
 
+        self.tactile_0['0_gfx'] = None
+        self.tactile_0['0_gfy'] = None
+        self.tactile_0['0_gfz'] = None
+        self.tactile_0['0_gtx'] = None
+        self.tactile_0['0_gty'] = None
+        self.tactile_0['0_gtz'] = None
         self.tactile_0['0_friction_est'] = None
         self.tactile_0['0_target_grip_force'] = None
         self.tactile_0['0_is_sd_active'] = None
         self.tactile_0['0_is_ref_loaded'] = None
         self.tactile_0['0_is_contact'] = None
 
+        self.tactile_1['1_gfx'] = None
+        self.tactile_1['1_gfy'] = None
+        self.tactile_1['1_gfz'] = None
+        self.tactile_1['1_gtx'] = None
+        self.tactile_1['1_gty'] = None
+        self.tactile_1['1_gtz'] = None
         self.tactile_1['1_friction_est'] = None
         self.tactile_1['1_target_grip_force'] = None
         self.tactile_1['1_is_sd_active'] = None

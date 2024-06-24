@@ -9,7 +9,7 @@ from actionlib import SimpleActionClient, SimpleActionServer
 from papillarray_ros_v2.msg import SensorState
 from papillarray_ros_v2.srv import *
 from geometry_msgs.msg import Pose, PoseStamped
-from trial_control.msg import PullAction, PullGoal, PullFeedback, PullResult, MoveAction, MoveGoal, MoveFeedback, MoveResult
+from trial_control.msg import PullAction, PullGoal, PullFeedback, PullResult, MoveAction, MoveGoal, MoveFeedback, MoveResult, RecordGoal, RecordAction, PullGoal, PullAction
 from trial_control.srv import PictureTrigger, PictureTriggerResponse, TactileGlobal, CablePullTrigger
 from geometry_msgs.msg import PoseStamped
 import os
@@ -36,7 +36,7 @@ class CablePull:
         self.tactile_0_global_xyz = []
         self.tactile_1_global_xyz = []
         self.global_x_max = 4.0
-        self.global_y_max = 2.0
+        self.global_y_max = 2.5
         self.global_z_max = 9.0
         self.global_z_exceeded = False
         self.global_y_exceeded = False   
@@ -47,6 +47,12 @@ class CablePull:
         self.window_size = 10
         self.numerator_diff = []
         self.denominator_diff = []
+
+        # Setup the recording action client
+        self.record_ac = SimpleActionClient("record_server", RecordAction)
+        rospy.loginfo("Waiting for recording server to come up.")
+        self.record_ac.wait_for_server()
+        rospy.loginfo("Recording server up!")
 
         # Gripper Publisher
         self.gripper_pos_pub = rospy.Publisher('Gripper_Cmd', String, queue_size=5)
@@ -149,6 +155,11 @@ class CablePull:
 
         self.bias_request_srv_client()
         rospy.loginfo("Biasing tactile sensors")
+
+        # Send the filename to the record action (starts recording)
+        goal = RecordGoal(file_name='unseated_failed_1')
+        self.record_ac.send_goal(goal)
+        # time.sleep(2.5)
 
         self.gripper_pos_pub.publish(f"current_10")
         rospy.loginfo("Closing the gripper")
